@@ -7,7 +7,7 @@ test('authenticates and renders the operations dashboard', async ({ page }) => {
     updatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(),
     latencyMs: 84, timeline: [], response: { statusCode: 201, headers: {}, body: '{"ok":true}' },
   };
-  await page.route('http://localhost:8081/api/admin/**', async (route) => {
+  await page.route('**/api/admin/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith('/stats')) await route.fulfill({ json: { total: 1, processing: 0, indeterminate: 0, completedRate: 100 } });
     else if (path.endsWith('/rec-smoke')) await route.fulfill({ json: record });

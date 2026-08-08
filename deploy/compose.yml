@@ -41,6 +41,7 @@ services:
 
   demo-upstream:
     <<: *app
+    profiles: [demo]
     build:
       context: ..
       dockerfile: Dockerfile.demo
@@ -60,14 +61,13 @@ services:
       dockerfile: Dockerfile.gateway
     depends_on:
       postgres: {condition: service_healthy}
-      demo-upstream: {condition: service_healthy}
     environment:
       ASPNETCORE_URLS: http://+:8080
       RetryShield__PostgresConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-retryshield};Username=${POSTGRES_USER:-retryshield};Password=${POSTGRES_PASSWORD}
       RetryShield__RedisConnectionString: redis:6379,password=${REDIS_PASSWORD},ssl=false
       RetryShield__EncryptionKeyBase64: ${RETRYSHIELD_ENCRYPTION_KEY:?Set a 16/24/32-byte base64 encryption key}
       RetryShield__ProcessingTimeout: ${PROCESSING_TIMEOUT:-00:05:00}
-      Gateway__UpstreamBaseUrl: http://demo-upstream:8080/
+      Gateway__UpstreamBaseUrl: ${UPSTREAM_BASE_URL:-http://demo-upstream:8080/}
       Gateway__MaxBodyBytes: ${MAX_REQUEST_BODY_BYTES:-1048576}
       Gateway__MaxResponseBodyBytes: ${MAX_RESPONSE_BODY_BYTES:-2097152}
       Gateway__RecordTtl: ${RECORD_TTL:-1.00:00:00}
@@ -126,6 +126,7 @@ services:
     command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--web.enable-lifecycle"]
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     ports: ["127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"]
     networks: [backend]

@@ -40,8 +40,8 @@ export interface RecordQuery {
   status?: string;
 }
 
-const configuredUrl = import.meta.env.VITE_ADMIN_API_URL?.trim();
-export const API_URL = (configuredUrl || 'http://localhost:8081').replace(/\/$/, '');
+const configuredUrl = import.meta.env.VITE_ADMIN_API_URL?.trim().replace(/\/$/, '');
+export const API_URL = `${configuredUrl || ''}/api`;
 const TOKEN_KEY = 'retryshield.adminToken';
 
 export const tokenStore = {
@@ -71,19 +71,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const adminApi = {
-  stats: () => request<DashboardStats>('/api/admin/stats'),
+  stats: () => request<DashboardStats>('/admin/stats'),
   records: (query: RecordQuery = {}) => {
     const params = new URLSearchParams();
     if (query.search) params.set('search', query.search);
     if (query.status && query.status !== 'All') params.set('status', query.status);
     const suffix = params.size ? `?${params}` : '';
-    return request<IdempotencyRecord[]>(`/api/admin/records${suffix}`);
+    return request<IdempotencyRecord[]>(`/admin/records${suffix}`);
   },
-  record: (id: string) => request<IdempotencyRecord>(`/api/admin/records/${encodeURIComponent(id)}`),
+  record: (id: string) => request<IdempotencyRecord>(`/admin/records/${encodeURIComponent(id)}`),
   resolve: (id: string, state: 'Completed' | 'Failed') =>
-    request<IdempotencyRecord>(`/api/admin/records/${encodeURIComponent(id)}/resolve`, {
+    request<IdempotencyRecord>(`/admin/records/${encodeURIComponent(id)}/resolve`, {
       method: 'POST',
       body: JSON.stringify({ state }),
     }),
-  purgeExpired: () => request<{ purged: number }>('/api/admin/records/expired', { method: 'DELETE' }),
+  purgeExpired: () => request<{ purged: number }>('/admin/records/expired', { method: 'DELETE' }),
 };

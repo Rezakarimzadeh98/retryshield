@@ -67,8 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: docker compose -f deploy/compose.yml config --quiet
-      - run: docker compose --env-file deploy/.env.example -f deploy/compose.yml -f deploy/compose.release.yml config --quiet
-      - run: docker build -f Dockerfile.gateway -t retryshield-gateway:ci .
-      - run: docker build -f Dockerfile.admin-api -t retryshield-admin-api:ci .
-      - run: docker build --target dashboard -f Dockerfile.admin-api -t retryshield-admin-dashboard:ci .
-      - run: docker build -f Dockerfile.demo -t retryshield-demo:ci .
+      - run: docker compose --env-file deploy/.env.example --profile demo -f deploy/compose.yml -f deploy/compose.release.yml config --quiet
+      - run: UPSTREAM_BASE_URL=https://payments.example.test/ docker compose --env-file deploy/.env.example -f deploy/compose.yml -f deploy/compose.production.yml -f deploy/compose.release.yml config --quiet
+      - name: Run full-stack idempotency smoke test
+        run: bash ./scripts/smoke.sh

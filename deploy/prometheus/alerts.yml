@@ -1,0 +1,59 @@
+groups:
+  - name: retryshield-gateway
+    rules:
+      - alert: RetryShieldGatewayDown
+        expr: up{job="retryshield-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: RetryShield gateway metrics target is down
+          description: Prometheus has been unable to scrape the RetryShield gateway for more than two minutes.
+
+      - alert: RetryShieldIndeterminateOutcomes
+        expr: increase(retryshield_indeterminate_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: RetryShield recorded an indeterminate outcome
+          description: At least one upstream outcome became indeterminate in the last five minutes; do not retry it automatically.
+
+      - alert: RetryShieldHighConflictRate
+        expr: |
+          (
+            increase(retryshield_conflicts_total[10m])
+            /
+            clamp_min(increase(retryshield_requests_total[10m]), 1)
+          ) > 0.05
+          and increase(retryshield_requests_total[10m]) >= 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: RetryShield conflict rate is high
+          description: More than 5% of at least 20 requests have conflicted over the last ten minutes.
+
+      - alert: RetryShieldHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(retryshield_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: RetryShield p95 request latency is high
+          description: Gateway p95 request latency has exceeded one second for ten minutes.
+
+      - alert: RetryShieldReplayCounterAnomaly
+        expr: |
+          increase(retryshield_replays_total[10m])
+          >
+          increase(retryshield_requests_total[10m])
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: RetryShield replay counters are inconsistent
+          description: Replays exceeded total requests in the same window, indicating a metric reset or instrumentation anomaly.

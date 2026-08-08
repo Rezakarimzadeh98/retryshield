@@ -9,11 +9,7 @@ on:
         description: Existing semantic version tag (for example v1.2.3)
         required: true
 
-permissions:
-  contents: read
-  packages: write
-  id-token: write
-  attestations: write
+permissions: read-all
 
 jobs:
   validate:
@@ -31,9 +27,56 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-  publish:
+  quality:
     needs: validate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      POSTGRES_PASSWORD: release-postgres-password-not-for-production
+      REDIS_PASSWORD: release-redis-password-not-for-production
+      RETRYSHIELD_ADMIN_API_KEY: release-admin-key-not-for-production
+      RETRYSHIELD_ENCRYPTION_KEY: bG9jYWwtZGV2ZWxvcG1lbnQta2V5LTMyLWJ5dGVzISE=
+      GRAFANA_ADMIN_PASSWORD: release-grafana-password-not-for-production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.version }}
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore RetryShield.slnx
+      - run: dotnet build RetryShield.slnx --configuration Release --no-restore
+      - run: dotnet test RetryShield.slnx --configuration Release --no-build
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/admin/package-lock.json
+      - run: npm ci
+        working-directory: web/admin
+      - run: npm test
+        working-directory: web/admin
+      - run: npm run build
+        working-directory: web/admin
+      - run: npx playwright install --with-deps chromium
+        working-directory: web/admin
+      - run: npm run test:e2e
+        working-directory: web/admin
+      - name: Enforce architecture boundaries
+        shell: pwsh
+        run: ./scripts/check-architecture.ps1
+      - name: Prove one forward and one replay
+        run: bash ./scripts/smoke.sh
+
+  publish:
+    needs: [validate, quality]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -67,7 +110,8 @@ jobs:
           tags: |
             type=semver,pattern={{version}},value=${{ needs.validate.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.version }}
-      - uses: docker/build-push-action@v7
+      - id: build
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -80,3 +124,15 @@ jobs:
           cache-to: type=gha,mode=max
           sbom: true
           provenance: mode=max
+      - name: Record verifiable GitHub build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/retryshield-${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Scan the released image for high-severity vulnerabilities
+        run: |
+          docker run --rm \
+            aquasec/trivy:0.66.0@sha256:086971aaf400beebd94e8300fd8ea623774419597169156cec56eec5b00dfb1e \
+            image --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL \
+            "ghcr.io/${{ github.repository_owner }}/retryshield-${{ matrix.image }}:${{ steps.meta.outputs.version }}"

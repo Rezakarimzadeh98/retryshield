@@ -11,7 +11,7 @@ RetryShield provides request idempotency when clients send a stable, sufficientl
 - An uncertain upstream outcome is recorded as **indeterminate**; RetryShield does not silently retry it.
 - PostgreSQL is the authority. Redis is an optimization and cannot decide ownership or completion.
 
-The guarantee is scoped to one configured RetryShield data plane and its PostgreSQL database. It does not cover calls that bypass the gateway, upstream side effects performed outside the protected request, expired records, or clients that reuse keys incorrectly.
+The guarantee is scoped to one configured RetryShield data plane, its PostgreSQL database, and the service selected by `UPSTREAM_BASE_URL`. Changing that URL changes the protected upstream; use a stable production URL and control configuration changes through the deployment process. The guarantee does not cover calls that bypass the gateway, upstream side effects performed outside the protected request, expired records, or clients that reuse keys incorrectly.
 
 ## Client obligations
 

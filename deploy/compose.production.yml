@@ -1,0 +1,11 @@
+# Production overlay. The demo upstream remains disabled because it is assigned
+# to the "demo" profile in compose.yml.
+# Usage:
+# docker compose --env-file deploy/.env \
+#   -f deploy/compose.yml -f deploy/compose.production.yml \
+#   -f deploy/compose.release.yml up -d --wait
+
+services:
+  gateway:
+    environment:
+      Gateway__UpstreamBaseUrl: ${UPSTREAM_BASE_URL:?Set UPSTREAM_BASE_URL to the protected production upstream}
