@@ -162,7 +162,7 @@ Architecture decisions are recorded in [`docs/adr`](docs/adr). The data plane an
 
 ## Development
 
-Use the pinned .NET SDK and Node.js 22+:
+Use the pinned .NET SDK and Node.js 24+:
 
 ```bash
 dotnet restore
