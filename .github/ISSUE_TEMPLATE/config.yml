@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Ask a question / share an incident
+    url: https://github.com/Rezakarimzadeh98/retryshield/discussions
+    about: Use Discussions for design questions, adoption stories, and indeterminate-outcome incidents.
+  - name: Contribution map
+    url: https://github.com/Rezakarimzadeh98/retryshield/blob/main/docs/contribute.md
+    about: Pick a lane before opening a broad feature request.
   - name: Security reporting guidance
-    url: https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/privately-reporting-a-security-vulnerability
-    about: Follow SECURITY.md and use private vulnerability reporting when enabled.
+    url: https://github.com/Rezakarimzadeh98/retryshield/security/advisories/new
+    about: Follow SECURITY.md and use private vulnerability reporting.

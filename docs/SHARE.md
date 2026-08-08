@@ -1,59 +1,63 @@
 # Sharing RetryShield
 
-When presenting or publishing RetryShield, describe it as an idempotency gateway with durable PostgreSQL authority—not as a universal exactly-once system.
+Goal: help people discover the repo when they search for duplicate payments, idempotency keys, safe API retries, or self-hosted gateways—and give them one clear next action: try the demo, star, open a Discussion, or take a `good first issue`.
 
-Safe material to share:
+Describe RetryShield as an idempotency gateway with durable PostgreSQL authority—not as a universal exactly-once system. Always link [guarantees](guarantees.md).
 
-- architecture and ADRs;
-- synthetic demo traffic and aggregate metrics;
-- screenshots with tenant, key, host, and account labels removed;
-- benchmark methodology, hardware, versions, and configuration.
+## Safe material
+
+- architecture and ADRs
+- synthetic demo traffic and aggregate metrics
+- screenshots with tenant, key, host, and account labels removed
+- benchmark methodology, hardware, versions, and configuration
 
 Never share `.env` files, connection strings, API keys, encryption keys, raw idempotency keys, request/response bodies, production dashboards, database dumps, or logs containing customer data.
-
-Before publishing a benchmark, run multiple trials, report error rates and latency percentiles, distinguish fresh claims from replays, and state whether PostgreSQL and the upstream were local. Link to `docs/guarantees.md` so limitations travel with performance claims.
-
-Use the project name and logo only in ways that do not imply endorsement. Follow the repository license and attribute third-party components.
 
 ## Show HN
 
 **Title**
 
-`Show HN: RetryShield – a self-hosted idempotency gateway for uncertain API retries`
+`Show HN: RetryShield – self-hosted idempotency gateway for unsafe API retries`
 
 **Post**
 
-> I built RetryShield after focusing on a specific distributed-systems failure: an upstream commits a mutation, its response is lost, and the client retries.
+> I kept seeing the same failure: an API write succeeds, the response is lost, the client retries, and money/inventory moves twice.
 >
-> RetryShield claims an idempotency key in PostgreSQL before forwarding. Identical completed requests replay the stored response; a changed payload returns 422; concurrent duplicates wait briefly; ambiguous outcomes become `indeterminate` instead of being retried automatically.
+> RetryShield is a self-hosted idempotency gateway. It claims an `Idempotency-Key` in PostgreSQL before forwarding, replays completed responses, rejects conflicting payloads, and marks uncertain outcomes as `indeterminate` instead of guessing.
 >
-> It includes a .NET gateway, React operations console, PostgreSQL/optional Redis, Prometheus/Grafana, a payment demo, and a 50-client k6 exercise. The README is explicit about why this is not universal exactly-once delivery.
+> Docker Compose + GHCR images, React ops dashboard, Prometheus/Grafana, PostgreSQL concurrency tests, and a full-stack smoke test that proves one upstream forward and one replay.
 >
-> I would especially value feedback on the failure semantics, PostgreSQL claim transaction, and reconciliation workflow:
+> Looking for critique from people who have shipped payments/bookings, plus contributors for SDKs, Helm, and reconciliation hooks:
 > https://github.com/Rezakarimzadeh98/retryshield
 
 ## Reddit
 
+Useful subs: `r/programming`, `r/dotnet`, `r/devops`, `r/selfhosted`, `r/kubernetes`, fintech/engineering communities. Adapt tone; keep the failure concrete.
+
 **Title**
 
-`I built an open-source idempotency gateway that stops retries when the outcome is unknowable`
+`Open-source idempotency gateway that stops retries when the upstream outcome is unknowable`
 
 **Post**
 
-> RetryShield is a self-hosted reverse proxy for mutation endpoints. PostgreSQL is the authority; Redis is optional and cannot decide ownership. It handles exact response replay, payload conflicts, concurrent duplicates, encrypted retained bodies, and explicit operator resolution for indeterminate outcomes.
+> If you have ever had a timed-out payment client create a second charge, this is the failure mode.
 >
-> The repository includes Docker Compose, a demo payment API, OpenTelemetry/Prometheus instrumentation, Grafana, chaos scripts, and concurrency tests. I am looking for technical critique and focused contributions—not claiming universal exactly-once behavior.
+> RetryShield sits in front of mutation APIs, claims keys in PostgreSQL before forwarding, replays exact responses, and surfaces indeterminate outcomes to operators.
 >
-> Repo and architecture: https://github.com/Rezakarimzadeh98/retryshield
+> Stack: .NET gateway, React dashboard, Postgres/optional Redis, Compose, GHCR, Prometheus alerts, Grafana, concurrency + smoke tests.
+>
+> Honest about limits: not magical exactly-once. Feedback and focused PRs welcome.
+> https://github.com/Rezakarimzadeh98/retryshield
 
-## LinkedIn
+## LinkedIn / X
 
 > API retries are easy until a write succeeds and the response disappears.
 >
-> I built **RetryShield**, an open-source, self-hosted idempotency gateway that claims mutation keys in PostgreSQL before forwarding, replays completed responses, rejects conflicting payloads, and surfaces uncertain outcomes for operator reconciliation.
+> I open-sourced RetryShield: a self-hosted idempotency gateway that claims mutation keys in PostgreSQL before forwarding, replays completed responses, and stops automatic retries when the outcome is uncertain.
 >
-> The project combines a .NET clean architecture, React operations console, optional Redis, AES-GCM storage protection, OpenTelemetry/Prometheus/Grafana, Docker Compose, and concurrency/chaos exercises.
->
-> The important design choice: it does not hide uncertainty behind an “exactly once” claim.
->
+> Try the Docker demo, then tell me which client SDK or Helm chart would unblock your team.
 > https://github.com/Rezakarimzadeh98/retryshield
+
+## One-liner for bios and lists
+
+`RetryShield — self-hosted idempotency gateway that makes API retries safe when the outcome is uncertain.`
