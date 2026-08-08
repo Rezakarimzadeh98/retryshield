@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">RetryShield mark</title>
+  <defs>
+    <linearGradient id="shield" x1="18" y1="14" x2="108" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8b5cf6"/>
+      <stop offset=".52" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 8 112 27v36c0 29-20 47-48 57C36 110 16 92 16 63V27L64 8Z" fill="#070b18" stroke="url(#shield)" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M42 69a25 25 0 0 1 39-21l5-6v19H67l7-7a16 16 0 0 0-24 15H42Z" fill="#8b5cf6"/>
+  <path d="M86 61a25 25 0 0 1-39 21l-5 6V69h19l-7 7a16 16 0 0 0 24-15h8Z" fill="#22d3ee"/>
+</svg>

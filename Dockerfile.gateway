@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1.7
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+WORKDIR /src
+COPY RetryShield.slnx ./
+COPY src/RetryShield.Domain/RetryShield.Domain.csproj src/RetryShield.Domain/
+COPY src/RetryShield.Application/RetryShield.Application.csproj src/RetryShield.Application/
+COPY src/RetryShield.Infrastructure/RetryShield.Infrastructure.csproj src/RetryShield.Infrastructure/
+COPY src/RetryShield.Gateway/RetryShield.Gateway.csproj src/RetryShield.Gateway/
+RUN dotnet restore src/RetryShield.Gateway/RetryShield.Gateway.csproj
+COPY src/ src/
+RUN dotnet publish src/RetryShield.Gateway/RetryShield.Gateway.csproj -c Release -o /app --no-restore /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+RUN addgroup -S retryshield && adduser -S -G retryshield -u 10001 retryshield
+WORKDIR /app
+COPY --from=build --chown=retryshield:retryshield /app ./
+ENV ASPNETCORE_URLS=http://+:8080 DOTNET_EnableDiagnostics=0
+EXPOSE 8080
+USER 10001
+ENTRYPOINT ["dotnet", "RetryShield.Gateway.dll"]

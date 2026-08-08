@@ -1,0 +1,171 @@
+name: retryshield
+
+x-app: &app
+  restart: unless-stopped
+  networks: [backend]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  tmpfs: [/tmp]
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-retryshield}
+      POSTGRES_USER: ${POSTGRES_USER:-retryshield}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"]
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+
+  demo-upstream:
+    <<: *app
+    build:
+      context: ..
+      dockerfile: Dockerfile.demo
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+    ports: ["127.0.0.1:${DEMO_PORT:-8082}:8080"]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/payments/count]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  gateway:
+    <<: *app
+    build:
+      context: ..
+      dockerfile: Dockerfile.gateway
+    depends_on:
+      postgres: {condition: service_healthy}
+      demo-upstream: {condition: service_healthy}
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      RetryShield__PostgresConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-retryshield};Username=${POSTGRES_USER:-retryshield};Password=${POSTGRES_PASSWORD}
+      RetryShield__RedisConnectionString: redis:6379,password=${REDIS_PASSWORD},ssl=false
+      RetryShield__EncryptionKeyBase64: ${RETRYSHIELD_ENCRYPTION_KEY:?Set a 16/24/32-byte base64 encryption key}
+      RetryShield__ProcessingTimeout: ${PROCESSING_TIMEOUT:-00:05:00}
+      Gateway__UpstreamBaseUrl: http://demo-upstream:8080/
+      Gateway__MaxBodyBytes: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      Gateway__MaxResponseBodyBytes: ${MAX_RESPONSE_BODY_BYTES:-2097152}
+      Gateway__RecordTtl: ${RECORD_TTL:-1.00:00:00}
+      Gateway__DuplicateWait: ${DUPLICATE_WAIT:-00:00:02}
+    ports: ["127.0.0.1:${GATEWAY_PORT:-8080}:8080"]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/health/ready]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  admin-api:
+    <<: *app
+    build:
+      context: ..
+      dockerfile: Dockerfile.admin-api
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      RetryShield__PostgresConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-retryshield};Username=${POSTGRES_USER:-retryshield};Password=${POSTGRES_PASSWORD}
+      RetryShield__RedisConnectionString: redis:6379,password=${REDIS_PASSWORD},ssl=false
+      RetryShield__EncryptionKeyBase64: ${RETRYSHIELD_ENCRYPTION_KEY}
+      RetryShield__ProcessingTimeout: ${PROCESSING_TIMEOUT:-00:05:00}
+      Admin__BearerToken: ${RETRYSHIELD_ADMIN_API_KEY:?Set a strong admin bearer token}
+      Admin__AllowedOrigins__0: http://localhost:${ADMIN_DASHBOARD_PORT:-3000}
+    ports: ["127.0.0.1:${ADMIN_API_PORT:-8081}:8080"]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/health/ready]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  admin-dashboard:
+    build:
+      context: ..
+      dockerfile: Dockerfile.admin-api
+      target: dashboard
+    restart: unless-stopped
+    depends_on:
+      admin-api: {condition: service_healthy}
+    ports: ["127.0.0.1:${ADMIN_DASHBOARD_PORT:-3000}:8080"]
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp, /var/cache/nginx, /var/run]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/healthz]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--web.enable-lifecycle"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports: ["127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"]
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:9090/-/healthy]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    restart: unless-stopped
+    depends_on:
+      prometheus: {condition: service_healthy}
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:${GRAFANA_PORT:-3001}:3000"]
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD-SHELL, "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+networks:
+  backend:
+    driver: bridge
+    internal: false
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
