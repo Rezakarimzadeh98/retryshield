@@ -1,0 +1,21 @@
+# Pull published multi-architecture images instead of building locally.
+# Usage:
+# docker compose --env-file deploy/.env \
+#   -f deploy/compose.yml -f deploy/compose.release.yml up -d
+
+services:
+  demo-upstream:
+    image: ghcr.io/rezakarimzadeh98/retryshield-demo:${RETRYSHIELD_VERSION:-0.1.0}
+    pull_policy: always
+
+  gateway:
+    image: ghcr.io/rezakarimzadeh98/retryshield-gateway:${RETRYSHIELD_VERSION:-0.1.0}
+    pull_policy: always
+
+  admin-api:
+    image: ghcr.io/rezakarimzadeh98/retryshield-admin-api:${RETRYSHIELD_VERSION:-0.1.0}
+    pull_policy: always
+
+  admin-dashboard:
+    image: ghcr.io/rezakarimzadeh98/retryshield-admin-dashboard:${RETRYSHIELD_VERSION:-0.1.0}
+    pull_policy: always

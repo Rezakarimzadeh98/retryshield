@@ -15,8 +15,12 @@ GRAFANA_ADMIN_PASSWORD=replace-with-a-random-password
 From the repository root:
 
 ```sh
-docker compose --env-file deploy/.env -f deploy/compose.yml up --build --wait
+docker compose --env-file deploy/.env \
+  -f deploy/compose.yml -f deploy/compose.release.yml up -d --wait
 ```
+
+This pulls the published `amd64`/`arm64` images. To compile the stack locally, run
+`docker compose --env-file deploy/.env -f deploy/compose.yml up --build --wait`.
 
 Gateway, admin API, dashboard, demo upstream, Prometheus, and Grafana bind only to localhost on ports 8080, 8081, 3000, 8082, 9090, and 3001 respectively.
 

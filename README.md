@@ -10,6 +10,8 @@ A self-hosted idempotency gateway that prevents duplicate side effects, replays 
 [![CodeQL](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/codeql.yml/badge.svg)](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-18c29c.svg)](LICENSE)
 [![.NET 10](https://img.shields.io/badge/.NET-10-7c3aed.svg)](https://dotnet.microsoft.com/)
+[![GitHub release](https://img.shields.io/github/v/release/Rezakarimzadeh98/retryshield?display_name=tag&sort=semver)](https://github.com/Rezakarimzadeh98/retryshield/releases/latest)
+[![GHCR](https://img.shields.io/badge/GHCR-multi--arch_images-2496ed?logo=docker&logoColor=white)](https://github.com/Rezakarimzadeh98/retryshield/pkgs/container/retryshield-gateway)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Rezakarimzadeh98/retryshield/badge)](https://securityscorecards.dev/viewer/?uri=github.com/Rezakarimzadeh98/retryshield)
 
 ![RetryShield social preview](docs/assets/social-preview.png)
@@ -17,6 +19,17 @@ A self-hosted idempotency gateway that prevents duplicate side effects, replays 
 [Quick start](#quick-start) · [Guarantees](docs/guarantees.md) · [Operations](docs/operations.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 </div>
+
+## What RetryShield is for
+
+Put RetryShield in front of mutation endpoints where an accidental duplicate has a real cost:
+
+- **payments and payouts** — prevent a timed-out client from charging twice;
+- **orders and reservations** — stop duplicate inventory changes or bookings;
+- **invoices and provisioning** — return the first result without repeating the side effect;
+- **webhook consumers and internal APIs** — make at-least-once delivery safe and observable.
+
+It is designed for backend, platform, SRE, and fintech teams that need one reusable idempotency boundary instead of rebuilding retry handling in every service.
 
 ## The failure RetryShield handles
 
@@ -37,12 +50,28 @@ RetryShield claims an idempotency key in PostgreSQL **before** forwarding the mu
 
 Requirements: Docker with Compose v2.
 
+Run the released multi-architecture images—no .NET or Node.js toolchain required:
+
 ```bash
 git clone https://github.com/Rezakarimzadeh98/retryshield.git
 cd retryshield
 cp deploy/.env.example deploy/.env
-docker compose --env-file deploy/.env -f deploy/compose.yml up --build
+docker compose --env-file deploy/.env \
+  -f deploy/compose.yml -f deploy/compose.release.yml up -d
 ```
+
+PowerShell:
+
+```powershell
+git clone https://github.com/Rezakarimzadeh98/retryshield.git
+Set-Location retryshield
+Copy-Item deploy/.env.example deploy/.env
+docker compose --env-file deploy/.env `
+  -f deploy/compose.yml -f deploy/compose.release.yml up -d
+```
+
+To build every component from source instead, use
+`docker compose --env-file deploy/.env -f deploy/compose.yml up --build`.
 
 Send the same payment mutation twice:
 
@@ -76,6 +105,14 @@ curl http://localhost:8082/payments/count
 | Grafana | <http://localhost:3001> | `admin` / `retryshield` |
 
 Defaults are for local evaluation only. Replace every credential and encryption key before deployment.
+
+## What ships in the stack
+
+- **Gateway data plane** — atomic PostgreSQL claims, exact replay, bounded duplicate waiting, payload-conflict detection, and explicit indeterminate outcomes.
+- **Operations control plane** — authenticated API and React dashboard for searching records, reading timelines, resolving uncertainty, and purging expired data.
+- **Observability** — OpenTelemetry instrumentation, Prometheus metrics, a provisioned Grafana dashboard, health probes, and operational guidance.
+- **Security baseline** — fixed upstream origin, bounded bodies, header allowlists, AES-GCM payload protection, non-root/read-only containers, CodeQL, dependency review, SBOM, provenance, and Scorecard.
+- **Proof and failure tooling** — domain and architecture tests, a 50-client concurrency exercise, a payment demo, and documented chaos scenarios.
 
 ## How it works
 
@@ -181,6 +218,19 @@ Run the deterministic 50-client exercise after starting the Compose stack:
 k6 run scripts/load/50-concurrency.js
 ```
 
+## Published images
+
+Every semantic release publishes signed-build provenance and SBOM-enabled Linux images for `amd64` and `arm64`:
+
+```text
+ghcr.io/rezakarimzadeh98/retryshield-gateway
+ghcr.io/rezakarimzadeh98/retryshield-admin-api
+ghcr.io/rezakarimzadeh98/retryshield-admin-dashboard
+ghcr.io/rezakarimzadeh98/retryshield-demo
+```
+
+Use a version tag such as `0.1.0` in production instead of a moving tag. RetryShield is currently a `0.x` public preview: evaluate it against the documented guarantees, replace development secrets, and test backup and recovery before production use.
+
 ## Roadmap
 
 - Pluggable route policies and tenant-aware quotas
@@ -194,6 +244,8 @@ The roadmap is intentionally issue-driven. If one of these would solve a real pr
 ## Contributing
 
 Focused contributions are welcome: storage correctness, adversarial tests, observability, dashboard accessibility, and documentation all have clear boundaries. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and issues labeled [`good first issue`](https://github.com/Rezakarimzadeh98/retryshield/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
+If RetryShield solves a real failure mode for you, a GitHub star, a reproducible issue, or a short note in [Discussions](https://github.com/Rezakarimzadeh98/retryshield/discussions) helps shape the next release.
 
 ## License
 
