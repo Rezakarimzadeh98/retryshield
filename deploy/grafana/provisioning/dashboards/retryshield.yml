@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: RetryShield
+    orgId: 1
+    folder: RetryShield
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards
