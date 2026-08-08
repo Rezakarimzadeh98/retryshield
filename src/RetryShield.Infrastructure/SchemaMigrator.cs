@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Npgsql;
 
 namespace RetryShield.Infrastructure;
@@ -6,9 +8,9 @@ public static class RetryShieldSchemaMigrator
 {
     private const long AdvisoryLockId = 7_624_911_804_122_026_001;
 
-    private static readonly (int Version, string Sql)[] Migrations =
+    private static readonly Migration[] Migrations =
     [
-        (1, """
+        new(1, "v0.1_initial_schema", """
             CREATE TABLE IF NOT EXISTS retryshield_records (
               id uuid PRIMARY KEY, tenant text NOT NULL, route text NOT NULL, key text NOT NULL,
               fingerprint text NOT NULL, state text NOT NULL, status_code integer,
@@ -42,6 +44,8 @@ public static class RetryShieldSchemaMigrator
         await using (var historyCommand = new NpgsqlCommand("""
             CREATE TABLE IF NOT EXISTS retryshield_schema_migrations (
               version integer PRIMARY KEY,
+              name text NOT NULL,
+              checksum text NOT NULL,
               applied_at timestamptz NOT NULL DEFAULT now()
             )
             """, connection, transaction))
@@ -49,32 +53,56 @@ public static class RetryShieldSchemaMigrator
             await historyCommand.ExecuteNonQueryAsync(ct);
         }
 
-        int databaseVersion;
+        var applied = new Dictionary<int, AppliedMigration>();
         await using (var versionCommand = new NpgsqlCommand(
-            "SELECT COALESCE(MAX(version), 0) FROM retryshield_schema_migrations",
+            "SELECT version,name,checksum FROM retryshield_schema_migrations ORDER BY version",
             connection, transaction))
         {
-            databaseVersion = Convert.ToInt32(await versionCommand.ExecuteScalarAsync(ct));
+            await using var reader = await versionCommand.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+                applied.Add(reader.GetInt32(0), new(reader.GetString(1), reader.GetString(2)));
         }
 
-        if (databaseVersion > CurrentVersion)
+        var unsupportedVersion = applied.Keys.FirstOrDefault(version => version > CurrentVersion);
+        if (unsupportedVersion > 0)
         {
             throw new InvalidOperationException(
-                $"Database schema version {databaseVersion} is newer than supported version {CurrentVersion}.");
+                $"Database schema version {unsupportedVersion} is newer than supported version {CurrentVersion}.");
         }
 
-        foreach (var migration in Migrations.Where(item => item.Version > databaseVersion))
+        foreach (var migration in Migrations)
         {
+            var checksum = Checksum(migration.Sql);
+            if (applied.TryGetValue(migration.Version, out var existing))
+            {
+                if (!StringComparer.Ordinal.Equals(existing.Name, migration.Name) ||
+                    !StringComparer.Ordinal.Equals(existing.Checksum, checksum))
+                {
+                    throw new InvalidOperationException(
+                        $"Schema migration {migration.Version} differs from the version recorded in the database.");
+                }
+                continue;
+            }
+
             await using var migrationCommand = new NpgsqlCommand(migration.Sql, connection, transaction);
             await migrationCommand.ExecuteNonQueryAsync(ct);
 
-            await using var recordCommand = new NpgsqlCommand(
-                "INSERT INTO retryshield_schema_migrations(version) VALUES (@version)",
-                connection, transaction);
+            await using var recordCommand = new NpgsqlCommand("""
+                INSERT INTO retryshield_schema_migrations(version,name,checksum)
+                VALUES (@version,@name,@checksum)
+                """, connection, transaction);
             recordCommand.Parameters.AddWithValue("version", migration.Version);
+            recordCommand.Parameters.AddWithValue("name", migration.Name);
+            recordCommand.Parameters.AddWithValue("checksum", checksum);
             await recordCommand.ExecuteNonQueryAsync(ct);
         }
 
         await transaction.CommitAsync(ct);
     }
+
+    private static string Checksum(string sql) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sql))).ToLowerInvariant();
+
+    private sealed record Migration(int Version, string Name, string Sql);
+    private sealed record AppliedMigration(string Name, string Checksum);
 }

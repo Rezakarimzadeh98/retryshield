@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to validate
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -14,12 +20,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       - run: dotnet restore RetryShield.slnx
       - run: dotnet build RetryShield.slnx --configuration Release --no-restore
-      - run: dotnet test RetryShield.slnx --configuration Release --no-build --logger "trx;LogFileName=tests.trx"
+      - name: Run unit tests
+        run: dotnet test tests/RetryShield.Domain.Tests/RetryShield.Domain.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=unit.trx"
+      - name: Run integration tests
+        run: dotnet test tests/RetryShield.Integration.Tests/RetryShield.Integration.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=integration.trx"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -31,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -52,11 +65,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - name: Enforce dependency direction
         shell: pwsh
         run: ./scripts/check-architecture.ps1
 
-  deployment:
+  compose-smoke:
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: ci-postgres-password-not-for-production
@@ -66,6 +81,8 @@ jobs:
       GRAFANA_ADMIN_PASSWORD: ci-grafana-password-not-for-production
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - run: docker compose -f deploy/compose.yml config --quiet
       - run: docker compose --env-file deploy/.env.example --profile demo -f deploy/compose.yml -f deploy/compose.release.yml config --quiet
       - run: UPSTREAM_BASE_URL=https://payments.example.test/ docker compose --env-file deploy/.env.example -f deploy/compose.yml -f deploy/compose.production.yml -f deploy/compose.release.yml config --quiet
