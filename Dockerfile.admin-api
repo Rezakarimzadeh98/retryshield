@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1.7
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+WORKDIR /src
+COPY RetryShield.slnx ./
+COPY src/RetryShield.Domain/RetryShield.Domain.csproj src/RetryShield.Domain/
+COPY src/RetryShield.Application/RetryShield.Application.csproj src/RetryShield.Application/
+COPY src/RetryShield.Infrastructure/RetryShield.Infrastructure.csproj src/RetryShield.Infrastructure/
+COPY src/RetryShield.AdminApi/RetryShield.AdminApi.csproj src/RetryShield.AdminApi/
+RUN dotnet restore src/RetryShield.AdminApi/RetryShield.AdminApi.csproj
+COPY src/ src/
+RUN dotnet publish src/RetryShield.AdminApi/RetryShield.AdminApi.csproj -c Release -o /app --no-restore /p:UseAppHost=false
+
+FROM node:22-alpine AS admin-web-build
+WORKDIR /web
+COPY web/admin/package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+COPY web/admin/ ./
+RUN npm run build
+
+FROM nginx:1.27-alpine AS dashboard
+COPY deploy/admin-dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=admin-web-build /web/dist /usr/share/nginx/html
+RUN sed -i 's#pid .*#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf \
+    && chown -R nginx:nginx /usr/share/nginx/html
+USER nginx
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+RUN addgroup -S retryshield && adduser -S -G retryshield -u 10001 retryshield
+WORKDIR /app
+COPY --from=build --chown=retryshield:retryshield /app ./
+ENV ASPNETCORE_URLS=http://+:8080 DOTNET_EnableDiagnostics=0
+EXPOSE 8080
+USER 10001
+ENTRYPOINT ["dotnet", "RetryShield.AdminApi.dll"]

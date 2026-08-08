@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/RetryShield.DemoUpstream/RetryShield.DemoUpstream.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/RetryShield.AdminApi/RetryShield.AdminApi.csproj" />
+    <Project Path="src/RetryShield.Application/RetryShield.Application.csproj" />
+    <Project Path="src/RetryShield.Domain/RetryShield.Domain.csproj" />
+    <Project Path="src/RetryShield.Gateway/RetryShield.Gateway.csproj" />
+    <Project Path="src/RetryShield.Infrastructure/RetryShield.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RetryShield.Domain.Tests/RetryShield.Domain.Tests.csproj" />
+    <Project Path="tests/RetryShield.Integration.Tests/RetryShield.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

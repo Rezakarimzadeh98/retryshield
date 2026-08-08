@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 10
+    groups:
+      dotnet:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /web/admin
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 10
+    groups:
+      admin-web:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule: {interval: weekly}
+    groups:
+      containers:
+        patterns: ["*"]

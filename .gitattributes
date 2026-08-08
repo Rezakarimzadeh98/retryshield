@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.png binary
+*.gif binary
+*.ico binary
+*.woff2 binary
+*.slnx linguist-language=C#
+docs/assets/* linguist-documentation
