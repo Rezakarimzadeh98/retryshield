@@ -2,7 +2,7 @@
 
 **Make API retries safe—even when the outcome is uncertain.**
 
-A self-hosted idempotency gateway that prevents duplicate side effects, replays exact responses, and stops unsafe retries when an upstream outcome cannot be proven.
+Self-hosted **idempotency gateway** for mutation APIs. Prevent duplicate payments, orders, bookings, and other side effects when clients timeout and retry. Claim the `Idempotency-Key` in PostgreSQL before forwarding, replay the exact response, and stop automatic retries when the upstream outcome cannot be proven.
 
 [![CI](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/ci.yml/badge.svg)](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/codeql.yml/badge.svg)](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/codeql.yml)
@@ -11,42 +11,41 @@ A self-hosted idempotency gateway that prevents duplicate side effects, replays 
 [![GitHub release](https://img.shields.io/github/v/release/Rezakarimzadeh98/retryshield?display_name=tag&sort=semver)](https://github.com/Rezakarimzadeh98/retryshield/releases/latest)
 [![GHCR](https://img.shields.io/badge/GHCR-multi--arch_images-2496ed?logo=docker&logoColor=white)](https://github.com/Rezakarimzadeh98/retryshield/pkgs/container/retryshield-gateway)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Rezakarimzadeh98/retryshield/badge)](https://securityscorecards.dev/viewer/?uri=github.com/Rezakarimzadeh98/retryshield)
+[![Discussions](https://img.shields.io/badge/discussions-join-1f6feb)](https://github.com/Rezakarimzadeh98/retryshield/discussions)
 
 ![RetryShield social preview](docs/assets/social-preview.png)
 
-[Quick start](#quick-start) · [Client contract](docs/client-integration.md) · [Guarantees](docs/guarantees.md) · [Operations](docs/operations.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[Why this exists](docs/why-retryshield.md) · [Quick start](#quick-start) · [FAQ](docs/faq.md) · [Client contract](docs/client-integration.md) · [Contribute](docs/contribute.md) · [Guarantees](docs/guarantees.md)
 
-## What RetryShield is for
+If this solves a failure you have hit in production: star the repo, open a Discussion with the incident shape, or grab a [`good first issue`](https://github.com/Rezakarimzadeh98/retryshield/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 
-Put RetryShield in front of mutation endpoints where an accidental duplicate has a real cost:
+## Who this is for
 
-- **payments and payouts** — prevent a timed-out client from charging twice;
-- **orders and reservations** — stop duplicate inventory changes or bookings;
-- **invoices and provisioning** — return the first result without repeating the side effect;
-- **webhook consumers and internal APIs** — make at-least-once delivery safe and observable.
+- backend/platform engineers protecting payment, payout, checkout, booking, invoice, or provisioning APIs
+- teams searching for Stripe-style `Idempotency-Key` behavior as a reusable gateway instead of one-off middleware
+- SRE/DevOps engineers who want Compose, GHCR images, Prometheus alerts, Grafana, and an ops dashboard
+- contributors who like distributed-systems correctness, React operations UI, observability, or developer docs
 
-It is designed for backend, platform, SRE, and fintech teams that need one reusable idempotency boundary instead of rebuilding retry handling in every service.
+## The failure people Google
 
-## The failure RetryShield handles
+A client sends `POST /payments`. The payment service commits the charge. The response is lost. The client times out and retries.
 
-A client sends `POST /payments`. The payment service commits the charge, but its response is lost. The client times out and retries. A normal reverse proxy forwards the request again; RetryShield does not.
-
-RetryShield claims an idempotency key in PostgreSQL **before** forwarding the mutation. It then:
-
-- replays the original status, headers, and body for a completed request;
-- rejects the same key with a different payload as `422 Unprocessable Entity`;
-- waits briefly for an identical in-flight request, then returns `409 Conflict`;
-- marks ambiguous delivery failures as `indeterminate`, requiring an operator decision instead of guessing.
-
-> RetryShield does not promise magical “exactly once” delivery. It makes duplicates observable and prevents automatic retries when the outcome is unknowable. Read the precise [guarantees and limits](docs/guarantees.md).
+A normal reverse proxy forwards again. **RetryShield does not.**
 
 ![RetryShield blocks a duplicate payment and replays the original response](docs/assets/retryshield-demo.gif)
 
+RetryShield claims the key in PostgreSQL **before** forwarding, then:
+
+- replays the original status, headers, and body for a completed request;
+- rejects the same key with a different payload as `422`;
+- waits briefly for an identical in-flight request, then returns `409`;
+- marks ambiguous delivery failures as `indeterminate` so operators decide instead of guessing.
+
+> RetryShield does not promise magical “exactly once” delivery. It makes duplicates observable and prevents automatic retries when the outcome is unknowable. Read the [guarantees](docs/guarantees.md) and [why it exists](docs/why-retryshield.md).
+
 ## Quick start
 
-Requirements: Docker with Compose v2.
-
-Run the released multi-architecture images—no .NET or Node.js toolchain required:
+Requirements: Docker with Compose v2. No .NET or Node.js toolchain needed for the released images.
 
 ```bash
 git clone https://github.com/Rezakarimzadeh98/retryshield.git
@@ -66,9 +65,6 @@ docker compose --env-file deploy/.env `
   --profile demo -f deploy/compose.yml -f deploy/compose.release.yml up -d
 ```
 
-To build every component from source instead, use
-`docker compose --env-file deploy/.env --profile demo -f deploy/compose.yml up --build`.
-
 Send the same payment mutation twice:
 
 ```bash
@@ -83,33 +79,38 @@ curl -i http://localhost:8080/proxy/payments \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: demo-payment-001" \
   -d '{"amount":4200,"currency":"USD"}'
-```
 
-The first response includes `Idempotency-Status: created`; the second is returned from durable storage with `Idempotency-Status: replayed`. The demo upstream counter remains `1`.
-
-```bash
 curl http://localhost:8082/payments/count
 ```
 
-| Surface | URL | Default local credential |
+### Expected result
+
+| Attempt | `Idempotency-Status` | Upstream payment count |
+| --- | --- | ---: |
+| First | `created` | `1` |
+| Second | `replayed` | still `1` |
+
+Then open:
+
+| Surface | URL | Local credential |
 | --- | --- | --- |
-| Gateway | <http://localhost:8080> | — |
 | Operations dashboard | <http://localhost:3000> | `dev-admin-token-change-me` |
 | Admin API / OpenAPI | <http://localhost:8081> | Bearer token above |
-| Demo upstream | <http://localhost:8082> | — |
-| Prometheus | <http://localhost:9090> | — |
 | Grafana | <http://localhost:3001> | `admin` / `retryshield` |
+| Prometheus | <http://localhost:9090> | — |
 
-Defaults are for local evaluation only. Replace every credential and encryption key before deployment.
-Before integrating a real client, follow the [key lifecycle and retry contract](docs/client-integration.md)—especially the rule that an indeterminate outcome must never be retried with a new key.
+Defaults are for local evaluation only. Replace every credential before production use. Client rules live in [client-integration.md](docs/client-integration.md); a copy-paste .NET helper is in [`samples/dotnet-client`](samples/dotnet-client).
 
-## What ships in the stack
+## Why teams adopt it
 
-- **Gateway data plane** — atomic PostgreSQL claims, exact replay, bounded duplicate waiting, payload-conflict detection, and explicit indeterminate outcomes.
-- **Operations control plane** — authenticated API and React dashboard for searching records, reading timelines, resolving uncertainty, and purging expired data.
-- **Observability** — OpenTelemetry instrumentation, Prometheus metrics, a provisioned Grafana dashboard, health probes, and operational guidance.
-- **Security baseline** — fixed upstream origin, bounded bodies, header allowlists, AES-GCM payload protection, non-root/read-only containers, CodeQL, dependency review, SBOM, provenance, and Scorecard.
-- **Proof and failure tooling** — domain and architecture tests, PostgreSQL Testcontainers coverage for 50 concurrent claims, a full-stack replay smoke test, a payment demo, and documented chaos scenarios.
+| Need | What ships |
+| --- | --- |
+| Stop duplicate side effects | Atomic PostgreSQL claim before forward |
+| Safe retries after timeout | Exact response replay with stable keys |
+| Uncertain upstream outcomes | Explicit `indeterminate` state + operator resolution |
+| Ops visibility | React dashboard, timelines, Prometheus alerts, Grafana |
+| Production packaging | Multi-arch GHCR images, Compose demo/production overlays, smoke test |
+| Trust | Domain/architecture tests, PostgreSQL 50-way concurrency tests, full-stack replay proof |
 
 ## How it works
 
@@ -128,7 +129,7 @@ flowchart LR
     G --> O[OpenTelemetry / Prometheus]
 ```
 
-PostgreSQL is authoritative. A Redis outage can reduce efficiency but cannot allow a duplicate forward. The upstream base address is fixed at startup, so request input cannot turn the gateway into an open proxy.
+PostgreSQL is authoritative. Redis outage cannot create a second owner for the same key. The upstream origin is fixed at startup, so request input cannot turn the gateway into an open proxy.
 
 ## State machine
 
@@ -145,8 +146,6 @@ stateDiagram-v2
     Indeterminate --> Expired: operator purges
 ```
 
-Illegal transitions are rejected in the domain layer. Request fingerprints are scoped by tenant and route; keys are not global across unrelated operations.
-
 ## Core behavior
 
 | Situation | Result | Upstream forwards |
@@ -158,45 +157,48 @@ Illegal transitions are rejected in the domain layer. Request fingerprints are s
 | Response lost after dispatch | `indeterminate` | 0 automatic retries |
 | Redis unavailable | PostgreSQL path continues | At most the valid claim |
 
-Stored bodies can be encrypted with AES-GCM. Request/response sizes, retained headers, routes, and retention are bounded and configurable.
+## Help make it better
+
+RetryShield grows fastest when adopters and contributors attack one sharp edge at a time:
+
+- **Use it** against a real mutation API and report the failure mode
+- **Review** architecture decisions in [`docs/adr`](docs/adr) and the guarantees doc
+- **Contribute** client SDKs, Helm/Kubernetes packaging, reconciliation hooks, dashboard UX, or docs
+- **Start small** with [`docs/contribute.md`](docs/contribute.md) and [`good first issue`](https://github.com/Rezakarimzadeh98/retryshield/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+
+Ready-to-post launch text lives in [`docs/SHARE.md`](docs/SHARE.md).
 
 ## Configuration
 
-The Compose stack documents every setting in [`deploy/.env.example`](deploy/.env.example). Important values:
+Important values from [`deploy/.env.example`](deploy/.env.example):
 
-- `RetryShield__PostgresConnectionString`: authoritative idempotency store.
-- `RetryShield__RedisConnectionString`: optional pub/sub optimization.
-- `Gateway__UpstreamBaseUrl`: fixed, trusted upstream origin.
-- `Gateway__DefaultTenant`: fixed scope for this single-tenant v1 deployment; clients cannot override it.
-- `RetryShield__EncryptionKeyBase64`: 16/24/32-byte key encoded as Base64.
-- `Gateway__MaxBodyBytes` / `Gateway__MaxResponseBodyBytes`: memory and storage limits.
-- `Gateway__DuplicateWait`: duplicate wait budget.
-- `Gateway__RecordTtl`: record retention window.
-- `RetryShield__ProcessingTimeout`: crash-window threshold; keep it above the upstream timeout.
-- `Admin__BearerToken`: operations API bearer token.
+- `UPSTREAM_BASE_URL`: protected upstream origin for production
+- `RetryShield__PostgresConnectionString`: authoritative store
+- `RetryShield__RedisConnectionString`: optional acceleration
+- `RetryShield__EncryptionKeyBase64`: AES-GCM key for stored bodies
+- `Gateway__MaxBodyBytes` / `Gateway__MaxResponseBodyBytes`
+- `Gateway__DuplicateWait` / `Gateway__RecordTtl`
+- `RetryShield__ProcessingTimeout`
+- `Admin__BearerToken`
 
-See [operations](docs/operations.md) for rotation, health probes, cleanup, alerts, and recovery.
+Production overlay, alerts, and recovery: [operations](docs/operations.md).
 
 ## Architecture
 
 ```text
 src/
-├── RetryShield.Domain          # state machine and invariants; no infrastructure
+├── RetryShield.Domain          # state machine and invariants
 ├── RetryShield.Application     # use cases and ports
-├── RetryShield.Infrastructure  # PostgreSQL, Redis, encryption, cleanup
-├── RetryShield.Gateway         # HTTP ingress and safe upstream forwarding
-└── RetryShield.AdminApi        # authenticated operational control plane
+├── RetryShield.Infrastructure  # PostgreSQL, Redis, encryption, migrations
+├── RetryShield.Gateway         # mutation ingress
+└── RetryShield.AdminApi        # control plane
 web/admin                       # React operations dashboard
-samples/RetryShield.DemoUpstream
-tests/                          # unit, architecture, concurrency, integration
+samples/                        # demo upstream + client examples
+tests/                          # unit, architecture, PostgreSQL, concurrency
 deploy/                         # Compose, Prometheus, Grafana
 ```
 
-Architecture decisions are recorded in [`docs/adr`](docs/adr). The data plane and control plane are separate processes so the dashboard cannot sit on the mutation hot path.
-
 ## Development
-
-Use the pinned .NET SDK and Node.js 24+:
 
 ```bash
 dotnet restore
@@ -209,15 +211,14 @@ npm test
 npm run build
 ```
 
-Run the deterministic 50-client exercise after starting the Compose stack:
+Full-stack proof after Compose is up:
 
 ```bash
+bash scripts/smoke.sh
 k6 run scripts/load/50-concurrency.js
 ```
 
 ## Published images
-
-Every semantic release publishes signed-build provenance and SBOM-enabled Linux images for `amd64` and `arm64`:
 
 ```text
 ghcr.io/rezakarimzadeh98/retryshield-gateway
@@ -226,26 +227,17 @@ ghcr.io/rezakarimzadeh98/retryshield-admin-dashboard
 ghcr.io/rezakarimzadeh98/retryshield-demo
 ```
 
-Use a version tag such as `0.2.0` in production instead of a moving tag. RetryShield is currently a `0.x` public preview: evaluate it against the documented guarantees, replace development secrets, and test backup and recovery before production use.
-
-For a real upstream, set `UPSTREAM_BASE_URL` and use the documented
-[production Compose overlay](docs/operations.md#production-baseline), which keeps the demo service disabled.
+Prefer version tags such as `0.2.0` over moving tags. This is a `0.x` public preview: evaluate guarantees, rotate secrets, and rehearse backup/recovery before production.
 
 ## Roadmap
 
-- Pluggable route policies and tenant-aware quotas
+- SDK helpers for common client stacks
+- Kubernetes manifests and Helm chart
 - First-class reconciliation hooks for indeterminate outcomes
+- Pluggable route policies and tenant-aware quotas
 - Additional storage adapters with the same safety contract
-- Kubernetes manifests and a Helm chart
-- SDK helpers for common client frameworks
 
-The roadmap is intentionally issue-driven. If one of these would solve a real production problem, open a discussion with the failure mode and constraints.
-
-## Contributing
-
-Focused contributions are welcome: storage correctness, adversarial tests, observability, dashboard accessibility, and documentation all have clear boundaries. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and issues labeled [`good first issue`](https://github.com/Rezakarimzadeh98/retryshield/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
-
-If RetryShield solves a real failure mode for you, a GitHub star, a reproducible issue, or a short note in [Discussions](https://github.com/Rezakarimzadeh98/retryshield/discussions) helps shape the next release.
+Vote with issues and Discussions. Real incident reports beat abstract feature requests.
 
 ## License
 

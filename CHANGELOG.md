@@ -4,6 +4,16 @@ All notable changes are documented here. This project follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Added
+
+- Adoption docs: why RetryShield exists, FAQ, contribution map, and launch sharing copy.
+- Retry-safe .NET client sample under `samples/dotnet-client`.
+
+### Changed
+
+- README rewritten for search discovery, first-run conversion, and contributor call-to-action.
+- Issue chooser now links Discussions and the contribution map.
+
 ## [0.2.0] - 2026-08-08
 
 ### Added
