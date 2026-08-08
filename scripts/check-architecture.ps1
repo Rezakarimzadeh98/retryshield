@@ -18,7 +18,8 @@ foreach ($projectName in $rules.Keys) {
   $references = @($xml.Project.ItemGroup.ProjectReference.Include)
   foreach ($reference in $references) {
     if (-not $reference) { continue }
-    $target = [IO.Path]::GetFileNameWithoutExtension($reference)
+    $normalized = $reference.Replace("\", "/")
+    $target = [IO.Path]::GetFileNameWithoutExtension(($normalized -split "/")[-1])
     if ($target -notin $rules[$projectName]) {
       $violations += "$projectName must not reference $target"
     }
