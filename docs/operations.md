@@ -18,6 +18,16 @@ docker compose --env-file deploy/.env \
 
 Omit `compose.release.yml` and add `--build` to build application images locally. Do not enable the `demo` profile in production. Validate the fully merged configuration before rollout with the same file order and `config -q`.
 
+## Tenant and key material
+
+Treat tenant IDs and `Idempotency-Key` values as operational identifiers, not secrets: they appear in client traffic and admin lookups. Response bodies and sensitive upstream payloads are encrypted at rest with `RETRYSHIELD_ENCRYPTION_KEY` (AES-GCM). Keep that key in a secret manager, rotate with a dual-key cutover, and never place raw keys or response bodies into metric labels, logs, or dashboards.
+
+Default storage posture:
+
+- **In transit:** terminate TLS at a trusted edge; do not expose the gateway or admin API on the public internet without authentication.
+- **At rest:** durable claim/result rows live in PostgreSQL; encrypted payload ciphertext requires the current encryption key to decrypt.
+- **Admin access:** protect the admin API/dashboard with a strong API key (and SSO in production). Operators can look up records by tenant and key, so restrict who can query.
+
 ## Health and telemetry
 
 - Liveness should prove the process can serve HTTP; readiness should include required durable dependencies.
