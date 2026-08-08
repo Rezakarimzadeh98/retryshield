@@ -118,6 +118,19 @@ public sealed class PostgresRepositoryTests : IAsyncLifetime
         Assert.Equal(RetryShieldSchemaMigrator.CurrentVersion, version);
     }
 
+    [Fact]
+    public async Task Global_stats_query_works_without_a_tenant_filter()
+    {
+        var claimed = await _repository.ClaimAsync(
+            NewRecord($"stats-{Guid.NewGuid():N}", "stats-fingerprint"), default);
+        Assert.Equal(ClaimKind.Claimed, claimed.Kind);
+
+        var stats = await _repository.StatsAsync(null, default);
+
+        Assert.True(stats.Total >= 1);
+        Assert.True(stats.ByState.ContainsKey(RecordState.Processing));
+    }
+
     private static IdempotencyRecord NewRecord(string key, string fingerprint) =>
         IdempotencyRecord.Create(
             "test", "/payments", key, fingerprint, DateTimeOffset.UtcNow.AddHours(1));

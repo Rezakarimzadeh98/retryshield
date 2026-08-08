@@ -147,8 +147,16 @@ public sealed class PostgresIdempotencyRepository(NpgsqlDataSource dataSource, I
     public async Task<RecordStats> StatsAsync(string? tenant, CancellationToken ct)
     {
         await using var conn = await dataSource.OpenConnectionAsync(ct);
-        await using var cmd = new NpgsqlCommand("SELECT state,count(*) FROM retryshield_records WHERE (@tenant IS NULL OR tenant=@tenant) GROUP BY state", conn);
-        cmd.Parameters.AddWithValue("tenant", (object?)tenant ?? DBNull.Value);
+        await using var cmd = new NpgsqlCommand { Connection = conn };
+        if (tenant is null)
+        {
+            cmd.CommandText = "SELECT state,count(*) FROM retryshield_records GROUP BY state";
+        }
+        else
+        {
+            cmd.CommandText = "SELECT state,count(*) FROM retryshield_records WHERE tenant=@tenant GROUP BY state";
+            cmd.Parameters.AddWithValue("tenant", tenant);
+        }
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         var states = new Dictionary<RecordState, long>();
         while (await reader.ReadAsync(ct)) states[ParseState(reader.GetString(0))] = reader.GetInt64(1);

@@ -27,7 +27,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"${compose[@]}" up --build --detach --wait --wait-timeout 240
+"${compose[@]}" up --build --detach --wait --wait-timeout 240 \
+  gateway demo-upstream admin-api admin-dashboard
 
 key="smoke-${GITHUB_RUN_ID:-local}-${RANDOM}"
 payload='{"amount":4200,"currency":"USD"}'
