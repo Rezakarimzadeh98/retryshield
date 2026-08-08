@@ -314,19 +314,6 @@ public static class ServiceCollectionExtensions
     {
         await using var scope = services.CreateAsyncScope();
         var dataSource = scope.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var cmd = dataSource.CreateCommand("""
-            CREATE TABLE IF NOT EXISTS retryshield_records (
-              id uuid PRIMARY KEY, tenant text NOT NULL, route text NOT NULL, key text NOT NULL,
-              fingerprint text NOT NULL, state text NOT NULL, status_code integer,
-              response_headers jsonb, response_body bytea, request_body bytea, error text,
-              created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL, expires_at timestamptz NOT NULL,
-              timeline jsonb NOT NULL,
-              CONSTRAINT ck_retryshield_state CHECK (state IN ('processing','completed','failed','indeterminate','expired')),
-              CONSTRAINT ck_retryshield_key_length CHECK (char_length(key) BETWEEN 1 AND 256),
-              UNIQUE (tenant,route,key));
-            CREATE INDEX IF NOT EXISTS ix_retryshield_records_expiry ON retryshield_records(expires_at);
-            CREATE INDEX IF NOT EXISTS ix_retryshield_records_tenant_state ON retryshield_records(tenant,state);
-            """);
-        await cmd.ExecuteNonQueryAsync(ct);
+        await RetryShieldSchemaMigrator.ApplyAsync(dataSource, ct);
     }
 }

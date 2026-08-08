@@ -1,8 +1,6 @@
-<div align="center">
-
 # RetryShield
 
-### Make API retries safe—even when the outcome is uncertain.
+**Make API retries safe—even when the outcome is uncertain.**
 
 A self-hosted idempotency gateway that prevents duplicate side effects, replays exact responses, and stops unsafe retries when an upstream outcome cannot be proven.
 
@@ -16,9 +14,7 @@ A self-hosted idempotency gateway that prevents duplicate side effects, replays 
 
 ![RetryShield social preview](docs/assets/social-preview.png)
 
-[Quick start](#quick-start) · [Guarantees](docs/guarantees.md) · [Operations](docs/operations.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
-
-</div>
+[Quick start](#quick-start) · [Client contract](docs/client-integration.md) · [Guarantees](docs/guarantees.md) · [Operations](docs/operations.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## What RetryShield is for
 
@@ -57,7 +53,7 @@ git clone https://github.com/Rezakarimzadeh98/retryshield.git
 cd retryshield
 cp deploy/.env.example deploy/.env
 docker compose --env-file deploy/.env \
-  -f deploy/compose.yml -f deploy/compose.release.yml up -d
+  --profile demo -f deploy/compose.yml -f deploy/compose.release.yml up -d
 ```
 
 PowerShell:
@@ -67,11 +63,11 @@ git clone https://github.com/Rezakarimzadeh98/retryshield.git
 Set-Location retryshield
 Copy-Item deploy/.env.example deploy/.env
 docker compose --env-file deploy/.env `
-  -f deploy/compose.yml -f deploy/compose.release.yml up -d
+  --profile demo -f deploy/compose.yml -f deploy/compose.release.yml up -d
 ```
 
 To build every component from source instead, use
-`docker compose --env-file deploy/.env -f deploy/compose.yml up --build`.
+`docker compose --env-file deploy/.env --profile demo -f deploy/compose.yml up --build`.
 
 Send the same payment mutation twice:
 
@@ -96,7 +92,7 @@ curl http://localhost:8082/payments/count
 ```
 
 | Surface | URL | Default local credential |
-|---|---|---|
+| --- | --- | --- |
 | Gateway | <http://localhost:8080> | — |
 | Operations dashboard | <http://localhost:3000> | `dev-admin-token-change-me` |
 | Admin API / OpenAPI | <http://localhost:8081> | Bearer token above |
@@ -105,6 +101,7 @@ curl http://localhost:8082/payments/count
 | Grafana | <http://localhost:3001> | `admin` / `retryshield` |
 
 Defaults are for local evaluation only. Replace every credential and encryption key before deployment.
+Before integrating a real client, follow the [key lifecycle and retry contract](docs/client-integration.md)—especially the rule that an indeterminate outcome must never be retried with a new key.
 
 ## What ships in the stack
 
@@ -112,7 +109,7 @@ Defaults are for local evaluation only. Replace every credential and encryption 
 - **Operations control plane** — authenticated API and React dashboard for searching records, reading timelines, resolving uncertainty, and purging expired data.
 - **Observability** — OpenTelemetry instrumentation, Prometheus metrics, a provisioned Grafana dashboard, health probes, and operational guidance.
 - **Security baseline** — fixed upstream origin, bounded bodies, header allowlists, AES-GCM payload protection, non-root/read-only containers, CodeQL, dependency review, SBOM, provenance, and Scorecard.
-- **Proof and failure tooling** — domain and architecture tests, a 50-client concurrency exercise, a payment demo, and documented chaos scenarios.
+- **Proof and failure tooling** — domain and architecture tests, PostgreSQL Testcontainers coverage for 50 concurrent claims, a full-stack replay smoke test, a payment demo, and documented chaos scenarios.
 
 ## How it works
 
@@ -153,7 +150,7 @@ Illegal transitions are rejected in the domain layer. Request fingerprints are s
 ## Core behavior
 
 | Situation | Result | Upstream forwards |
-|---|---|---:|
+| --- | --- | ---: |
 | First valid key | Claim and forward | 1 |
 | Same key + same request after completion | Exact stored response | 0 |
 | Same key + different request | `422` | 0 |
@@ -229,7 +226,10 @@ ghcr.io/rezakarimzadeh98/retryshield-admin-dashboard
 ghcr.io/rezakarimzadeh98/retryshield-demo
 ```
 
-Use a version tag such as `0.1.0` in production instead of a moving tag. RetryShield is currently a `0.x` public preview: evaluate it against the documented guarantees, replace development secrets, and test backup and recovery before production use.
+Use a version tag such as `0.2.0` in production instead of a moving tag. RetryShield is currently a `0.x` public preview: evaluate it against the documented guarantees, replace development secrets, and test backup and recovery before production use.
+
+For a real upstream, set `UPSTREAM_BASE_URL` and use the documented
+[production Compose overlay](docs/operations.md#production-baseline), which keeps the demo service disabled.
 
 ## Roadmap
 

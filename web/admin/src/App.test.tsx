@@ -37,7 +37,7 @@ describe('admin dashboard', () => {
     await userEvent.click(screen.getByRole('button', { name: /open console/i }));
     expect(sessionStorage.getItem('retryshield.adminToken')).toBe('secret-token');
     expect(await screen.findByText('payment-001')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/admin/stats'),
+    expect(fetch).toHaveBeenCalledWith('/api/admin/stats',
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer secret-token' }) }));
   });
 

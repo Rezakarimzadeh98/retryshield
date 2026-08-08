@@ -1,7 +1,10 @@
 # Pull published multi-architecture images instead of building locally.
 # Usage:
 # docker compose --env-file deploy/.env \
-#   -f deploy/compose.yml -f deploy/compose.release.yml up -d
+#   --profile demo -f deploy/compose.yml -f deploy/compose.release.yml up -d
+#
+# For production, insert deploy/compose.production.yml before this file and
+# omit --profile demo.
 
 services:
   demo-upstream:

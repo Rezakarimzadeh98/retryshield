@@ -4,6 +4,22 @@ All notable changes are documented here. This project follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-08
+
+### Added
+
+- PostgreSQL Testcontainers coverage for atomic 50-way claims, conflicts, replay persistence, stale recovery, and schema migration history.
+- Full-stack Compose smoke test proving one upstream forward and one exact replay.
+- Production Compose overlay, configurable upstream URL, and multi-architecture release-image quick start.
+- Prometheus alerts, client retry contract, and versioned schema migration guidance.
+- Verifiable GitHub build attestations and high-severity image vulnerability gates.
+
+### Changed
+
+- Dashboard API calls now use the same-origin nginx proxy and work outside localhost.
+- Container releases now run backend, web, architecture, PostgreSQL, and full-stack checks before publishing.
+- Demo services are opt-in and excluded from the production deployment path.
+
 ## [0.1.0] - 2026-08-08
 
 ### Added
@@ -17,5 +33,6 @@ All notable changes are documented here. This project follows [Keep a Changelog]
 - Operational, guarantee, chaos, security, contribution, and architecture documentation.
 - k6 concurrency and dependency-failure exercises.
 
-[Unreleased]: https://github.com/Rezakarimzadeh98/retryshield/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Rezakarimzadeh98/retryshield/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Rezakarimzadeh98/retryshield/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Rezakarimzadeh98/retryshield/releases/tag/v0.1.0
