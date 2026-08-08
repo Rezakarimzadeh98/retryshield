@@ -7,31 +7,59 @@ using Testcontainers.PostgreSql;
 
 namespace RetryShield.Integration.Tests;
 
-[Trait("Category", "Docker")]
-public sealed class PostgresRepositoryTests : IAsyncLifetime
+[CollectionDefinition("PostgreSQL integration", DisableParallelization = true)]
+public sealed class PostgreSqlCollection : ICollectionFixture<PostgreSqlFixture>
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("retryshield_tests")
-        .WithUsername("retryshield")
-        .WithPassword("retryshield-integration-password")
-        .Build();
+    public const string Name = "PostgreSQL integration";
+}
 
-    private NpgsqlDataSource _dataSource = null!;
-    private PostgresIdempotencyRepository _repository = null!;
+public sealed class PostgreSqlFixture : IAsyncLifetime
+{
+    private PostgreSqlContainer? _postgres;
+
+    public NpgsqlDataSource DataSource { get; private set; } = null!;
+    public PostgresIdempotencyRepository Repository { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
-        _dataSource = NpgsqlDataSource.Create(_postgres.GetConnectionString());
-        await RetryShieldSchemaMigrator.ApplyAsync(_dataSource);
-        _repository = new PostgresIdempotencyRepository(_dataSource, CreateProtector());
+        var connectionString = Environment.GetEnvironmentVariable("RETRYSHIELD_TEST_POSTGRES");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            _postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("retryshield_tests")
+                .WithUsername("retryshield")
+                .WithPassword("retryshield-integration-password")
+                .Build();
+            await _postgres.StartAsync();
+            connectionString = _postgres.GetConnectionString();
+        }
+
+        DataSource = NpgsqlDataSource.Create(connectionString);
+        await RetryShieldSchemaMigrator.ApplyAsync(DataSource);
+        Repository = new PostgresIdempotencyRepository(DataSource, CreateProtector());
     }
 
     public async Task DisposeAsync()
     {
-        await _dataSource.DisposeAsync();
-        await _postgres.DisposeAsync();
+        if (DataSource is not null) await DataSource.DisposeAsync();
+        if (_postgres is not null) await _postgres.DisposeAsync();
     }
+
+    private static AesGcmPayloadProtector CreateProtector() =>
+        new(Options.Create(new RetryShieldOptions
+        {
+            PostgresConnectionString = "provided-by-integration-fixture",
+            EncryptionKeyBase64 = Convert.ToBase64String(
+                Enumerable.Range(0, 32).Select(value => (byte)value).ToArray())
+        }));
+}
+
+[Trait("Category", "Docker")]
+[Collection(PostgreSqlCollection.Name)]
+public sealed class PostgresRepositoryTests(PostgreSqlFixture database)
+{
+    private NpgsqlDataSource DataSource => database.DataSource;
+    private PostgresIdempotencyRepository Repository => database.Repository;
 
     [Fact]
     public async Task Fifty_concurrent_postgres_claims_have_exactly_one_winner()
@@ -41,7 +69,7 @@ public sealed class PostgresRepositoryTests : IAsyncLifetime
         var tasks = Enumerable.Range(0, 50).Select(async _ =>
         {
             await gate.Task;
-            return await _repository.ClaimAsync(NewRecord(key, "same-fingerprint"), default);
+            return await Repository.ClaimAsync(NewRecord(key, "same-fingerprint"), default);
         }).ToArray();
 
         gate.SetResult();
@@ -56,8 +84,8 @@ public sealed class PostgresRepositoryTests : IAsyncLifetime
     public async Task Postgres_rejects_a_reused_key_with_a_different_fingerprint()
     {
         var key = $"mismatch-{Guid.NewGuid():N}";
-        var first = await _repository.ClaimAsync(NewRecord(key, "fingerprint-one"), default);
-        var second = await _repository.ClaimAsync(NewRecord(key, "fingerprint-two"), default);
+        var first = await Repository.ClaimAsync(NewRecord(key, "fingerprint-one"), default);
+        var second = await Repository.ClaimAsync(NewRecord(key, "fingerprint-two"), default);
 
         Assert.Equal(ClaimKind.Claimed, first.Kind);
         Assert.Equal(ClaimKind.FingerprintMismatch, second.Kind);
@@ -69,16 +97,16 @@ public sealed class PostgresRepositoryTests : IAsyncLifetime
     {
         var record = NewRecord($"replay-{Guid.NewGuid():N}", "replay-fingerprint");
         Assert.Equal(ClaimKind.Claimed,
-            (await _repository.ClaimAsync(record, default)).Kind);
+            (await Repository.ClaimAsync(record, default)).Kind);
 
         var response = new StoredResponse(
             201,
             new Dictionary<string, string[]> { ["Content-Type"] = ["application/json"] },
             """{"id":"pay_000001"}"""u8.ToArray());
         record.Complete(response);
-        await _repository.SaveAsync(record, default);
+        await Repository.SaveAsync(record, default);
 
-        var persisted = await _repository.GetByIdAsync(record.Id, default);
+        var persisted = await Repository.GetByIdAsync(record.Id, default);
 
         Assert.NotNull(persisted);
         Assert.Equal(RecordState.Completed, persisted.State);
@@ -94,11 +122,11 @@ public sealed class PostgresRepositoryTests : IAsyncLifetime
         var record = IdempotencyRecord.Create(
             "test", "/payments", $"stale-{Guid.NewGuid():N}", "stale-fingerprint",
             now.AddHours(1), now.AddMinutes(-10));
-        await _repository.ClaimAsync(record, default);
+        await Repository.ClaimAsync(record, default);
 
-        var changed = await _repository.MarkStaleProcessingIndeterminateAsync(
+        var changed = await Repository.MarkStaleProcessingIndeterminateAsync(
             now.AddMinutes(-5), default);
-        var persisted = await _repository.GetByIdAsync(record.Id, default);
+        var persisted = await Repository.GetByIdAsync(record.Id, default);
 
         Assert.Equal(1, changed);
         Assert.Equal(RecordState.Indeterminate, persisted!.State);
@@ -108,24 +136,51 @@ public sealed class PostgresRepositoryTests : IAsyncLifetime
     [Fact]
     public async Task Schema_migrations_are_idempotent_and_record_the_current_version()
     {
-        await RetryShieldSchemaMigrator.ApplyAsync(_dataSource);
-        await RetryShieldSchemaMigrator.ApplyAsync(_dataSource);
+        await RetryShieldSchemaMigrator.ApplyAsync(DataSource);
+        await RetryShieldSchemaMigrator.ApplyAsync(DataSource);
 
-        await using var command = _dataSource.CreateCommand(
-            "SELECT MAX(version) FROM retryshield_schema_migrations");
-        var version = Convert.ToInt32(await command.ExecuteScalarAsync());
+        await using var command = DataSource.CreateCommand(
+            "SELECT version,name,checksum FROM retryshield_schema_migrations");
+        await using var reader = await command.ExecuteReaderAsync();
 
-        Assert.Equal(RetryShieldSchemaMigrator.CurrentVersion, version);
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(RetryShieldSchemaMigrator.CurrentVersion, reader.GetInt32(0));
+        Assert.Equal("v0.1_initial_schema", reader.GetString(1));
+        Assert.Equal(64, reader.GetString(2).Length);
+        Assert.False(await reader.ReadAsync());
+    }
+
+    [Fact]
+    public async Task Concurrent_startups_adopt_v01_schema_without_losing_records()
+    {
+        var record = NewRecord($"pre-migrations-{Guid.NewGuid():N}", "legacy-fingerprint");
+        await Repository.ClaimAsync(record, default);
+        await using (var dropHistory = DataSource.CreateCommand(
+            "DROP TABLE retryshield_schema_migrations"))
+        {
+            await dropHistory.ExecuteNonQueryAsync();
+        }
+
+        await Task.WhenAll(Enumerable.Range(0, 10)
+            .Select(_ => RetryShieldSchemaMigrator.ApplyAsync(DataSource)));
+        var persisted = await Repository.GetByIdAsync(record.Id, default);
+        await using var countHistory = DataSource.CreateCommand(
+            "SELECT count(*) FROM retryshield_schema_migrations");
+        var migrationCount = Convert.ToInt32(await countHistory.ExecuteScalarAsync());
+
+        Assert.NotNull(persisted);
+        Assert.Equal(record.Fingerprint, persisted.Fingerprint);
+        Assert.Equal(1, migrationCount);
     }
 
     [Fact]
     public async Task Global_stats_query_works_without_a_tenant_filter()
     {
-        var claimed = await _repository.ClaimAsync(
+        var claimed = await Repository.ClaimAsync(
             NewRecord($"stats-{Guid.NewGuid():N}", "stats-fingerprint"), default);
         Assert.Equal(ClaimKind.Claimed, claimed.Kind);
 
-        var stats = await _repository.StatsAsync(null, default);
+        var stats = await Repository.StatsAsync(null, default);
 
         Assert.True(stats.Total >= 1);
         Assert.True(stats.ByState.ContainsKey(RecordState.Processing));
@@ -135,11 +190,4 @@ public sealed class PostgresRepositoryTests : IAsyncLifetime
         IdempotencyRecord.Create(
             "test", "/payments", key, fingerprint, DateTimeOffset.UtcNow.AddHours(1));
 
-    private static AesGcmPayloadProtector CreateProtector() =>
-        new(Options.Create(new RetryShieldOptions
-        {
-            PostgresConnectionString = "provided-by-testcontainer",
-            EncryptionKeyBase64 = Convert.ToBase64String(
-                Enumerable.Range(0, 32).Select(value => (byte)value).ToArray())
-        }));
 }
