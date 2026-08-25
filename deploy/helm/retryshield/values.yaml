@@ -1,0 +1,88 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullPolicy: IfNotPresent
+
+secrets:
+  create: false
+  existingSecret: retryshield-secrets
+  data:
+    postgresConnectionString: "Host=postgres;Port=5432;Database=retryshield;Username=retryshield;Password=change-me"
+    redisConnectionString: "redis:6379,password=change-me,ssl=false"
+    encryptionKeyBase64: "replace-with-base64-16-24-or-32-byte-key"
+    adminBearerToken: "replace-with-strong-admin-token"
+
+gateway:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/rezakarimzadeh98/retryshield-gateway
+    tag: "0.2.0"
+  service:
+    type: ClusterIP
+    port: 8080
+  upstreamBaseUrl: http://demo-upstream:8080/
+  processingTimeout: "00:05:00"
+  maxBodyBytes: "1048576"
+  maxResponseBodyBytes: "2097152"
+  duplicateWait: "00:00:02"
+  recordTtl: "1.00:00:00"
+  resources: {}
+  readinessProbe:
+    path: /health/ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 6
+  livenessProbe:
+    path: /health/ready
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+adminApi:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/rezakarimzadeh98/retryshield-admin-api
+    tag: "0.2.0"
+  service:
+    type: ClusterIP
+    port: 8080
+  allowedOrigins:
+    - http://localhost:3000
+  processingTimeout: "00:05:00"
+  resources: {}
+  readinessProbe:
+    path: /health/ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 6
+  livenessProbe:
+    path: /health/ready
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+adminDashboard:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/rezakarimzadeh98/retryshield-admin-dashboard
+    tag: "0.2.0"
+  service:
+    type: ClusterIP
+    port: 8080
+  resources: {}
+  readinessProbe:
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 6
+  livenessProbe:
+    path: /healthz
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3

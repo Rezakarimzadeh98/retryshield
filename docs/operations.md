@@ -49,6 +49,44 @@ RetryShield records applied versions in `retryshield_schema_migrations`. Gateway
 
 Use rolling deployment only when schema versions are backward compatible. Back up PostgreSQL, deploy one new instance, confirm the migration version and readiness, then continue the rollout. Drain new requests, allow in-flight claims to settle, and stop old instances only after the new version is healthy. Future destructive migrations must be split into expand/migrate/contract releases and applied only after all old versions are gone.
 
+## Kubernetes (Helm)
+
+RetryShield includes a minimal Helm chart at `deploy/helm/retryshield` for:
+
+- gateway
+- admin API
+- admin dashboard
+
+The chart intentionally does not deploy PostgreSQL or Redis. Provide durable infrastructure separately and inject connection strings through a Kubernetes Secret.
+
+Create namespace and secret:
+
+```sh
+kubectl create namespace retryshield
+kubectl -n retryshield create secret generic retryshield-secrets \
+  --from-literal=postgresConnectionString='Host=postgres;Port=5432;Database=retryshield;Username=retryshield;Password=change-me' \
+  --from-literal=redisConnectionString='redis:6379,password=change-me,ssl=false' \
+  --from-literal=encryptionKeyBase64='replace-with-base64-key' \
+  --from-literal=adminBearerToken='replace-with-strong-token'
+```
+
+Validate the chart before deploy:
+
+```sh
+helm lint ./deploy/helm/retryshield
+helm template retryshield ./deploy/helm/retryshield --namespace retryshield
+```
+
+Install or upgrade:
+
+```sh
+helm upgrade --install retryshield ./deploy/helm/retryshield \
+  --namespace retryshield \
+  --set gateway.upstreamBaseUrl='https://your-upstream.example/'
+```
+
+For production, set resource requests/limits for all components, lock allowed CORS origins for the admin API, and source secrets from an external secret manager pipeline.
+
 ## Incident response
 
 Prefer fail-closed behavior when authority is unavailable. Preserve database and gateway logs, note key rotation state, and classify affected requests as complete, conflicting, or indeterminate. Do not replay indeterminate writes automatically. Follow `SECURITY.md` for suspected compromise.
