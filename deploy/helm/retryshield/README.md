@@ -41,6 +41,14 @@ helm lint ./deploy/helm/retryshield
 helm template retryshield ./deploy/helm/retryshield --namespace retryshield
 ```
 
+The chart includes `values.schema.json`, so `helm lint` validates value structure and required settings before deployment.
+
+For example, this fails fast if required values are missing or invalid:
+
+```bash
+helm lint ./deploy/helm/retryshield --set gateway.upstreamBaseUrl=''
+```
+
 ## Important Values
 
 - `secrets.existingSecret`: Secret name containing required credentials
