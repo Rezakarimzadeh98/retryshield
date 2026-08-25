@@ -1,0 +1,6 @@
+apiVersion: v2
+name: retryshield
+description: Minimal Helm chart for RetryShield gateway, admin API, and admin dashboard
+type: application
+version: 0.1.0
+appVersion: "0.2.0"

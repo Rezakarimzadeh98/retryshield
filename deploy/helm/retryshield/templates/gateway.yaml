@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "retryshield.fullname" . }}-gateway
+  labels:
+    {{- include "retryshield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "retryshield.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "retryshield.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: RetryShield__PostgresConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: postgresConnectionString
+            - name: RetryShield__RedisConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: redisConnectionString
+            - name: RetryShield__EncryptionKeyBase64
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: encryptionKeyBase64
+            - name: RetryShield__ProcessingTimeout
+              value: {{ .Values.gateway.processingTimeout | quote }}
+            - name: Gateway__UpstreamBaseUrl
+              value: {{ .Values.gateway.upstreamBaseUrl | quote }}
+            - name: Gateway__MaxBodyBytes
+              value: {{ .Values.gateway.maxBodyBytes | quote }}
+            - name: Gateway__MaxResponseBodyBytes
+              value: {{ .Values.gateway.maxResponseBodyBytes | quote }}
+            - name: Gateway__RecordTtl
+              value: {{ .Values.gateway.recordTtl | quote }}
+            - name: Gateway__DuplicateWait
+              value: {{ .Values.gateway.duplicateWait | quote }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.gateway.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.gateway.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.gateway.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.gateway.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.gateway.readinessProbe.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.gateway.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.gateway.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.gateway.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.gateway.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.gateway.livenessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "retryshield.fullname" . }}-gateway
+  labels:
+    {{- include "retryshield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  type: {{ .Values.gateway.service.type }}
+  selector:
+    {{- include "retryshield.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: {{ .Values.gateway.service.port }}
+      targetPort: http

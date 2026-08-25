@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "retryshield.fullname" . }}-admin-api
+  labels:
+    {{- include "retryshield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-api
+spec:
+  replicas: {{ .Values.adminApi.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "retryshield.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: admin-api
+  template:
+    metadata:
+      labels:
+        {{- include "retryshield.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: admin-api
+    spec:
+      containers:
+        - name: admin-api
+          image: "{{ .Values.adminApi.image.repository }}:{{ .Values.adminApi.image.tag }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: RetryShield__PostgresConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: postgresConnectionString
+            - name: RetryShield__RedisConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: redisConnectionString
+            - name: RetryShield__EncryptionKeyBase64
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: encryptionKeyBase64
+            - name: RetryShield__ProcessingTimeout
+              value: {{ .Values.adminApi.processingTimeout | quote }}
+            - name: Admin__BearerToken
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: adminBearerToken
+            {{- range $index, $origin := .Values.adminApi.allowedOrigins }}
+            - name: Admin__AllowedOrigins__{{ $index }}
+              value: {{ $origin | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.adminApi.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.adminApi.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.adminApi.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.adminApi.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.adminApi.readinessProbe.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.adminApi.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.adminApi.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.adminApi.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.adminApi.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.adminApi.livenessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.adminApi.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "retryshield.fullname" . }}-admin-api
+  labels:
+    {{- include "retryshield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-api
+spec:
+  type: {{ .Values.adminApi.service.type }}
+  selector:
+    {{- include "retryshield.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-api
+  ports:
+    - name: http
+      port: {{ .Values.adminApi.service.port }}
+      targetPort: http
