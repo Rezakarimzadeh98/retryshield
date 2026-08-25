@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "RetryShield Helm values",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["secrets", "gateway", "adminApi", "adminDashboard"],
+  "properties": {
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "imagePullPolicy": {
+      "type": "string",
+      "enum": ["Always", "IfNotPresent", "Never"]
+    },
+    "secrets": {
+      "type": "object",
+      "required": ["existingSecret", "create"],
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "postgresConnectionString": {
+              "type": "string",
+              "minLength": 1
+            },
+            "redisConnectionString": {
+              "type": "string",
+              "minLength": 1
+            },
+            "encryptionKeyBase64": {
+              "type": "string",
+              "minLength": 1
+            },
+            "adminBearerToken": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "required": ["image", "service", "upstreamBaseUrl", "readinessProbe", "livenessProbe"],
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "type": "object",
+          "required": ["repository", "tag"],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "service": {
+          "type": "object",
+          "required": ["type", "port"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            }
+          }
+        },
+        "upstreamBaseUrl": {
+          "type": "string",
+          "pattern": "^https?://.+"
+        },
+        "processingTimeout": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxBodyBytes": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "maxResponseBodyBytes": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "duplicateWait": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recordTtl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readinessProbe": {
+          "$ref": "#/definitions/probe"
+        },
+        "livenessProbe": {
+          "$ref": "#/definitions/probe"
+        }
+      }
+    },
+    "adminApi": {
+      "type": "object",
+      "required": ["image", "service", "allowedOrigins", "readinessProbe", "livenessProbe"],
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "allowedOrigins": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^https?://.+"
+          },
+          "minItems": 1
+        },
+        "processingTimeout": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readinessProbe": {
+          "$ref": "#/definitions/probe"
+        },
+        "livenessProbe": {
+          "$ref": "#/definitions/probe"
+        }
+      }
+    },
+    "adminDashboard": {
+      "type": "object",
+      "required": ["image", "service", "readinessProbe", "livenessProbe"],
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "readinessProbe": {
+          "$ref": "#/definitions/probe"
+        },
+        "livenessProbe": {
+          "$ref": "#/definitions/probe"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["type", "port"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "required": ["path", "initialDelaySeconds", "periodSeconds", "timeoutSeconds", "failureThreshold"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "initialDelaySeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "periodSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "failureThreshold": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
