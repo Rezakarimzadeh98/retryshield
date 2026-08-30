@@ -6,13 +6,16 @@ All notable changes are documented here. This project follows [Keep a Changelog]
 
 ### Added
 
+- Product vision: RetryShield as learn + kit + gateway home for safe operations (`docs/VISION.md`).
+- Front-door pattern kit under `kit/` (failure story, contract, Node/Express/ASP.NET/FastAPI/webhook snippets).
 - Adoption docs: why RetryShield exists, FAQ, contribution map, and launch sharing copy.
 - Retry-safe .NET client sample under `samples/dotnet-client`.
 
 ### Changed
 
-- README rewritten for search discovery, first-run conversion, and contributor call-to-action.
-- Issue chooser now links Discussions and the contribution map.
+- README reframed around three entry paths (learn / kit / gateway) while keeping the Compose quick start.
+- Contribution map prioritizes kit language packs.
+- Sharing copy updated for the broader positioning.
 
 ## [0.2.0] - 2026-08-08
 

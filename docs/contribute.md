@@ -6,12 +6,13 @@ Pick one lane. Small, reviewable pull requests land fastest.
 
 | Lane | Why users care | Start here |
 | --- | --- | --- |
-| Client examples | People need copy-paste retry-safe code | `samples/`, issue #5 |
-| Docs / search clarity | People discover the repo by failure mode | `docs/`, FAQ, use-case guides |
-| Dashboard UX | Operators need to resolve uncertainty quickly | `web/admin/`, issue #6 |
-| Observability | Teams need alerts and investigation panels | `deploy/grafana/`, Prometheus rules |
-| Correctness tests | Trust comes from concurrency and crash proofs | `tests/` |
-| Packaging | Production users need Helm/K8s | roadmap issues |
+| **Kit language packs** | Front-door adoption: “I can steal this today” | `kit/`, patterns + snippets |
+| Client examples | Retry-safe callers against the gateway | `samples/` |
+| Docs / search clarity | Discovery by failure mode, not jargon | `docs/VISION.md`, FAQ, use-case guides |
+| Dashboard UX | Operators resolve uncertainty quickly | `web/admin/`, issue #6 |
+| Observability | Alerts and investigation panels | `deploy/grafana/`, Prometheus rules |
+| Correctness tests | Trust under concurrency and crash | `tests/` |
+| Packaging | Production install paths | `deploy/` Helm, Compose |
 
 ## Before you open a PR
 

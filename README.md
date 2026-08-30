@@ -1,8 +1,18 @@
 # RetryShield
 
-**Make API retries safe—even when the outcome is uncertain.**
+**The home for safe operations — when important work must not run twice, disappear, or finish in an unprovable state.**
 
-Self-hosted **idempotency gateway** for mutation APIs. Prevent duplicate payments, orders, bookings, and other side effects when clients timeout and retry. Claim the `Idempotency-Key` in PostgreSQL before forwarding, replay the exact response, and stop automatic retries when the upstream outcome cannot be proven.
+User taps Pay. The charge commits. The response never arrives. They tap again. Without a shared contract you often get two charges. The same failure shows up in bookings, webhooks, queues, and background jobs.
+
+This repository is three things on one contract:
+
+| Path | Time to value | Start |
+| --- | --- | --- |
+| **Learn** | 2 minutes | [The failure](kit/patterns/01-the-failure.md) · [Vision](docs/VISION.md) |
+| **Kit** | 5 minutes | [Copy-paste patterns](kit/README.md) (Node, Express, ASP.NET, FastAPI, webhooks) |
+| **Gateway** | ~10 minutes | [Quick start](#quick-start) — self-hosted idempotency edge with PostgreSQL authority |
+
+Steal the kit when you would otherwise rewrite a half-correct Map check. Run the gateway when many services need the same durable claim, replay, and operator workflow for uncertain outcomes.
 
 [![CI](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/ci.yml/badge.svg)](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/codeql.yml/badge.svg)](https://github.com/Rezakarimzadeh98/retryshield/actions/workflows/codeql.yml)
@@ -15,16 +25,17 @@ Self-hosted **idempotency gateway** for mutation APIs. Prevent duplicate payment
 
 ![RetryShield social preview](docs/assets/social-preview.png)
 
-[Why this exists](docs/why-retryshield.md) · [Quick start](#quick-start) · [FAQ](docs/faq.md) · [Client contract](docs/client-integration.md) · [Contribute](docs/contribute.md) · [Guarantees](docs/guarantees.md)
+[Vision](docs/VISION.md) · [Kit](kit/README.md) · [Why](docs/why-retryshield.md) · [FAQ](docs/faq.md) · [Client contract](docs/client-integration.md) · [Contribute](docs/contribute.md) · [Guarantees](docs/guarantees.md)
 
-If this solves a failure you have hit in production: star the repo, open a Discussion with the incident shape, or grab a [`good first issue`](https://github.com/Rezakarimzadeh98/retryshield/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+Star, open a Discussion with your incident shape, or take a [`good first issue`](https://github.com/Rezakarimzadeh98/retryshield/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — including kit language packs.
 
 ## Who this is for
 
+- developers who keep rewriting “don’t double-charge” logic and want a correct shared contract
 - backend/platform engineers protecting payment, payout, checkout, booking, invoice, or provisioning APIs
-- teams searching for Stripe-style `Idempotency-Key` behavior as a reusable gateway instead of one-off middleware
+- teams that want Stripe-style `Idempotency-Key` behavior as a reusable gateway—not one-off middleware in every service
 - SRE/DevOps engineers who want Compose, GHCR images, Prometheus alerts, Grafana, and an ops dashboard
-- contributors who like distributed-systems correctness, React operations UI, observability, or developer docs
+- contributors who like reliability docs, client kits, React ops UI, or distributed-systems correctness
 
 ## The failure people Google
 
@@ -34,16 +45,16 @@ A normal reverse proxy forwards again. **RetryShield does not.**
 
 ![RetryShield blocks a duplicate payment and replays the original response](docs/assets/retryshield-demo.gif)
 
-RetryShield claims the key in PostgreSQL **before** forwarding, then:
+The gateway claims the key in PostgreSQL **before** forwarding, then:
 
 - replays the original status, headers, and body for a completed request;
 - rejects the same key with a different payload as `422`;
 - waits briefly for an identical in-flight request, then returns `409`;
 - marks ambiguous delivery failures as `indeterminate` so operators decide instead of guessing.
 
-> RetryShield does not promise magical “exactly once” delivery. It makes duplicates observable and prevents automatic retries when the outcome is unknowable. Read the [guarantees](docs/guarantees.md) and [why it exists](docs/why-retryshield.md).
+> RetryShield does not promise magical “exactly once” delivery. It makes duplicates observable and prevents automatic retries when the outcome is unknowable. Read the [guarantees](docs/guarantees.md) and [vision](docs/VISION.md).
 
-## Quick start
+## Quick start (gateway)
 
 Requirements: Docker with Compose v2. No .NET or Node.js toolchain needed for the released images.
 
@@ -186,6 +197,8 @@ Production overlay, alerts, and recovery: [operations](docs/operations.md).
 ## Architecture
 
 ```text
+kit/                            # learn + copy-paste patterns (front door)
+docs/                           # vision, guarantees, ops, ADRs
 src/
 ├── RetryShield.Domain          # state machine and invariants
 ├── RetryShield.Application     # use cases and ports
@@ -195,7 +208,7 @@ src/
 web/admin                       # React operations dashboard
 samples/                        # demo upstream + client examples
 tests/                          # unit, architecture, PostgreSQL, concurrency
-deploy/                         # Compose, Prometheus, Grafana
+deploy/                         # Compose, Prometheus, Grafana, Helm
 ```
 
 ## Development
@@ -231,13 +244,13 @@ Prefer version tags such as `0.2.0` over moving tags. This is a `0.x` public pre
 
 ## Roadmap
 
-- SDK helpers for common client stacks
-- Kubernetes manifests and Helm chart
+- Expand the [kit](kit/README.md): more languages, queue/outbox sketches, better tests for snippets
+- Published SDK helpers that speak the gateway contract
 - First-class reconciliation hooks for indeterminate outcomes
 - Pluggable route policies and tenant-aware quotas
 - Additional storage adapters with the same safety contract
 
-Vote with issues and Discussions. Real incident reports beat abstract feature requests.
+Helm chart for gateway + admin already ships under `deploy/`. Vote with issues and Discussions. Real incident reports beat abstract feature requests.
 
 ## License
 
