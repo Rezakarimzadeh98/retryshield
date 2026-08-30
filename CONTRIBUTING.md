@@ -10,6 +10,7 @@ Use GitHub Discussions or an issue for substantial behavior, protocol, schema, o
 
 High-value contribution themes:
 
+- kit language packs and failure-mode docs (`kit/`)
 - client examples and SDKs
 - Helm/Kubernetes packaging
 - indeterminate reconciliation workflows
