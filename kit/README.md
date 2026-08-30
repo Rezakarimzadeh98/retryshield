@@ -18,7 +18,9 @@ When in-app storage is not enough (multi-instance races, shared APIs, operator w
 | [`snippets/express-middleware.js`](snippets/express-middleware.js) | Express: in-process claim + replay (single instance / learning) |
 | [`snippets/aspnet-filter.cs`](snippets/aspnet-filter.cs) | ASP.NET: same contract as a filter sketch |
 | [`snippets/fastapi-dependency.py`](snippets/fastapi-dependency.py) | FastAPI: dependency-style claim sketch |
+| [`snippets/go-middleware.go`](snippets/go-middleware.go) | Go `net/http`: claim + replay sketch |
 | [`snippets/webhook-dedupe.md`](snippets/webhook-dedupe.md) | Provider webhooks that can arrive twice |
+| [`snippets/outbox-or-queue.md`](snippets/outbox-or-queue.md) | Queue redelivery / transactional outbox inbox |
 
 ## Hard limits of the kit
 
