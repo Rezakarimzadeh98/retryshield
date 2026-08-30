@@ -1,63 +1,37 @@
 # Sharing RetryShield
 
-Goal: help people discover the repo when they search for duplicate payments, idempotency keys, safe API retries, or self-hosted gateways—and give them one clear next action: try the demo, star, open a Discussion, or take a `good first issue`.
+Goal: people searching for double charges, unsafe retries, webhook dedupe, or “idempotency done right” should find a **home**—learn, steal a kit, or run the gateway—not only a Docker binary.
 
-Describe RetryShield as an idempotency gateway with durable PostgreSQL authority—not as a universal exactly-once system. Always link [guarantees](guarantees.md).
+Always link [guarantees](guarantees.md). Never claim magical exactly-once.
 
 ## Safe material
 
 - architecture and ADRs
-- synthetic demo traffic and aggregate metrics
-- screenshots with tenant, key, host, and account labels removed
-- benchmark methodology, hardware, versions, and configuration
+- kit patterns and synthetic demos
+- screenshots with tenant/key/host labels removed
+- benchmark methodology
 
-Never share `.env` files, connection strings, API keys, encryption keys, raw idempotency keys, request/response bodies, production dashboards, database dumps, or logs containing customer data.
+Never share `.env`, secrets, raw keys, production payloads, or customer logs.
 
 ## Show HN
 
 **Title**
 
-`Show HN: RetryShield – self-hosted idempotency gateway for unsafe API retries`
+`Show HN: RetryShield – stop double charges when the response never comes back`
 
 **Post**
 
-> I kept seeing the same failure: an API write succeeds, the response is lost, the client retries, and money/inventory moves twice.
+> I kept seeing the same failure: a write succeeds, the response is lost, the client retries, and money or inventory moves twice.
 >
-> RetryShield is a self-hosted idempotency gateway. It claims an `Idempotency-Key` in PostgreSQL before forwarding, replays completed responses, rejects conflicting payloads, and marks uncertain outcomes as `indeterminate` instead of guessing.
+> RetryShield is now three layers: plain-language patterns you can steal in five minutes, copy-paste kit snippets (Node/Express/ASP.NET/FastAPI/webhooks), and a self-hosted idempotency gateway that claims keys in PostgreSQL before forwarding, replays responses, and marks uncertain outcomes instead of guessing.
 >
-> Docker Compose + GHCR images, React ops dashboard, Prometheus/Grafana, PostgreSQL concurrency tests, and a full-stack smoke test that proves one upstream forward and one replay.
->
-> Looking for critique from people who have shipped payments/bookings, plus contributors for SDKs, Helm, and reconciliation hooks:
+> Looking for people who have shipped that incident—and PRs that add language packs to the kit:
 > https://github.com/Rezakarimzadeh98/retryshield
 
-## Reddit
+## Reddit / LinkedIn / X
 
-Useful subs: `r/programming`, `r/dotnet`, `r/devops`, `r/selfhosted`, `r/kubernetes`, fintech/engineering communities. Adapt tone; keep the failure concrete.
+Lead with the human failure (“user paid, phone timed out, tapped again”), then offer two next actions: open `kit/` or run Compose. End with a ask for incident-shaped Discussions or a language-pack PR.
 
-**Title**
+## One-liner
 
-`Open-source idempotency gateway that stops retries when the upstream outcome is unknowable`
-
-**Post**
-
-> If you have ever had a timed-out payment client create a second charge, this is the failure mode.
->
-> RetryShield sits in front of mutation APIs, claims keys in PostgreSQL before forwarding, replays exact responses, and surfaces indeterminate outcomes to operators.
->
-> Stack: .NET gateway, React dashboard, Postgres/optional Redis, Compose, GHCR, Prometheus alerts, Grafana, concurrency + smoke tests.
->
-> Honest about limits: not magical exactly-once. Feedback and focused PRs welcome.
-> https://github.com/Rezakarimzadeh98/retryshield
-
-## LinkedIn / X
-
-> API retries are easy until a write succeeds and the response disappears.
->
-> I open-sourced RetryShield: a self-hosted idempotency gateway that claims mutation keys in PostgreSQL before forwarding, replays completed responses, and stops automatic retries when the outcome is uncertain.
->
-> Try the Docker demo, then tell me which client SDK or Helm chart would unblock your team.
-> https://github.com/Rezakarimzadeh98/retryshield
-
-## One-liner for bios and lists
-
-`RetryShield — self-hosted idempotency gateway that makes API retries safe when the outcome is uncertain.`
+`RetryShield — learn, steal, or deploy the contract that stops unsafe retries when the outcome is uncertain.`
