@@ -25,7 +25,7 @@ Steal the kit when you would otherwise rewrite a half-correct Map check. Run the
 
 ![RetryShield social preview](docs/assets/social-preview.png)
 
-[Vision](docs/VISION.md) · [Kit](kit/README.md) · [Why](docs/why-retryshield.md) · [FAQ](docs/faq.md) · [Client contract](docs/client-integration.md) · [Contribute](docs/contribute.md) · [Guarantees](docs/guarantees.md)
+[Vision](docs/VISION.md) · [Kit](kit/README.md) · [Why](docs/why-retryshield.md) · [FAQ](docs/faq.md) · [Client contract](docs/client-integration.md) · [Contribute](docs/contribute.md) · [Guarantees](docs/guarantees.md) · [Go Global plan](docs/GO_GLOBAL.md)
 
 Star, open a Discussion with your incident shape, or take a [`good first issue`](https://github.com/Rezakarimzadeh98/retryshield/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — including kit language packs.
 
