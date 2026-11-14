@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-alpine AS build
 WORKDIR /src
 COPY RetryShield.slnx ./
 COPY src/RetryShield.Domain/RetryShield.Domain.csproj src/RetryShield.Domain/
@@ -29,7 +29,7 @@ RUN sed -i \
     && chown -R nginx:nginx /usr/share/nginx/html
 USER nginx
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-alpine AS final
 RUN addgroup -S retryshield && adduser -S -G retryshield -u 10001 retryshield
 WORKDIR /app
 COPY --from=build --chown=retryshield:retryshield /app ./
