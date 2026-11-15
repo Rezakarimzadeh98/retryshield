@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   Activity, AlertTriangle, ArchiveX, Check, CheckCircle2, ChevronRight, CircleDot,
   Clock3, Copy, Database, KeyRound, LogOut, RefreshCw, Search, ShieldCheck, X, XCircle,
@@ -6,9 +6,57 @@ import {
 import { adminApi, API_URL, DashboardStats, IdempotencyRecord, RecordStatus, tokenStore } from './api';
 
 const statuses: Array<'All' | RecordStatus> = ['All', 'Processing', 'Completed', 'Failed', 'Indeterminate', 'Expired'];
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(value));
+}
+
+/** Move focus into a container, trap Tab inside it, restore on cleanup. Escape calls onEscape. */
+function useFocusTrap(
+  active: boolean,
+  containerRef: RefObject<HTMLElement | null>,
+  onEscape?: () => void,
+) {
+  useEffect(() => {
+    if (!active) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusables = () =>
+      Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+      );
+    const initial = focusables()[0];
+    initial?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onEscape?.();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      previouslyFocused?.focus();
+    };
+  }, [active, containerRef, onEscape]);
 }
 
 function StatusBadge({ status }: { status: RecordStatus }) {
@@ -59,8 +107,14 @@ function RecordDrawer({ record, loading, onClose, onResolve }: {
 }) {
   const [confirm, setConfirm] = useState<'Completed' | 'Failed' | null>(null);
   const [busy, setBusy] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const open = Boolean(record || loading);
+  const cancelConfirm = useCallback(() => setConfirm(null), []);
   useEffect(() => setConfirm(null), [record?.id]);
-  if (!record && !loading) return null;
+  useFocusTrap(open && !confirm, drawerRef, onClose);
+  useFocusTrap(Boolean(confirm), modalRef, cancelConfirm);
+  if (!open) return null;
   async function resolve() {
     if (!confirm) return;
     setBusy(true);
@@ -68,7 +122,7 @@ function RecordDrawer({ record, loading, onClose, onResolve }: {
   }
   return <>
     <button className="drawer-scrim" aria-label="Close record details" onClick={onClose} />
-    <aside className="drawer" aria-label="Record details" aria-live="polite">
+    <aside ref={drawerRef} className="drawer" role="dialog" aria-modal={!confirm} aria-label="Record details" aria-live="polite">
       <div className="drawer-head">
         <div><p className="eyebrow">Record details</p><h2>{record?.key || 'Loading…'}</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
@@ -109,12 +163,13 @@ function RecordDrawer({ record, loading, onClose, onResolve }: {
         </section>
       </div>}
     </aside>
-    {confirm && <div className="modal-wrap" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-      <div className="modal"><div className={`confirm-icon ${confirm.toLowerCase()}`}>
-        {confirm === 'Completed' ? <CheckCircle2 /> : <XCircle />}</div>
+    {confirm && <div className="modal-wrap" role="presentation">
+      <div ref={modalRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div className={`confirm-icon ${confirm.toLowerCase()}`}>
+          {confirm === 'Completed' ? <CheckCircle2 /> : <XCircle />}</div>
         <h2 id="confirm-title">Mark as {confirm.toLowerCase()}?</h2>
         <p>This records an explicit administrative resolution and cannot be undone.</p>
-        <div className="modal-actions"><button className="button ghost" onClick={() => setConfirm(null)} disabled={busy}>Cancel</button>
+        <div className="modal-actions"><button className="button ghost" onClick={cancelConfirm} disabled={busy}>Cancel</button>
           <button className={`button ${confirm === 'Completed' ? 'success' : 'danger'}`} onClick={resolve} disabled={busy}>
             {busy ? 'Resolving…' : `Confirm ${confirm.toLowerCase()}`}</button></div>
       </div>
