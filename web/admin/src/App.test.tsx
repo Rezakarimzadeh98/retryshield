@@ -57,9 +57,37 @@ describe('admin dashboard', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'View payment-001' }));
     expect(await screen.findByText('Resolution required')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /mark completed/i }));
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /mark as completed/i })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /confirm completed/i }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/resolve'),
       expect.objectContaining({ method: 'POST' })));
+  });
+
+  it('moves focus into the drawer and closes it with Escape', async () => {
+    sessionStorage.setItem('retryshield.adminToken', 'token');
+    const user = userEvent.setup();
+    render(<App />);
+    const view = await screen.findByRole('button', { name: 'View payment-001' });
+    await user.click(view);
+    const drawer = await screen.findByRole('dialog', { name: 'Record details' });
+    expect(drawer.contains(document.activeElement)).toBe(true);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Record details' })).not.toBeInTheDocument());
+  });
+
+  it('traps focus in the confirmation dialog and Escape cancels it', async () => {
+    sessionStorage.setItem('retryshield.adminToken', 'token');
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'View payment-001' }));
+    await screen.findByText('Resolution required');
+    await user.click(screen.getByRole('button', { name: /mark completed/i }));
+    const confirm = screen.getByRole('dialog', { name: /mark as completed/i });
+    expect(confirm.contains(document.activeElement)).toBe(true);
+    await user.tab();
+    expect(confirm.contains(document.activeElement)).toBe(true);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /mark as completed/i })).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: 'Record details' })).toBeInTheDocument();
   });
 });

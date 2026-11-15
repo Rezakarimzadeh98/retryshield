@@ -19,6 +19,6 @@ test('authenticates and renders the operations dashboard', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Idempotency records' })).toBeVisible();
   await expect(page.getByText('smoke-payment')).toBeVisible();
   await page.getByRole('button', { name: 'View smoke-payment' }).click();
-  await expect(page.getByRole('complementary', { name: 'Record details' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Record details' })).toBeVisible();
   await expect(page.getByText('HTTP status')).toBeVisible();
 });
